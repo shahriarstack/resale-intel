@@ -20,12 +20,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
         <nav className="sidebar-nav">
           <Link href="/" className="nav-item">Dashboard</Link>
-          <Link href="/inventory" className="nav-item">Inventory</Link>
-          <Link href="/sales" className="nav-item">Sales</Link>
+          <Link href="/capture" className="nav-item">Capture Vehicle</Link>
+          <Link href="/inventory" className="nav-item">Vehicles</Link>
+          <Link href="/sales" className="nav-item">Sales Showroom</Link>
+          {(session.user as any)?.role === 'SUPER_ADMIN' && (
+            <Link href="/admin/users" className="nav-item">User Management</Link>
+          )}
           <Link href="/settings" className="nav-item">Settings</Link>
         </nav>
         <div className="sidebar-footer">
-          <div className="user-info">{session.user?.email}</div>
+          <div className="user-info">{(session.user as any)?.name}</div>
           <Link href="/api/auth/signout" className="logout-btn">Sign Out</Link>
         </div>
       </aside>
@@ -41,13 +45,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <span className="icon">📊</span>
           <span>Home</span>
         </Link>
+        <Link href="/capture" className="bottom-nav-item">
+          <span className="icon">📷</span>
+          <span>Capture</span>
+        </Link>
         <Link href="/inventory" className="bottom-nav-item">
           <span className="icon">📦</span>
-          <span>Items</span>
+          <span>Vehicles</span>
         </Link>
         <Link href="/sales" className="bottom-nav-item">
           <span className="icon">💰</span>
-          <span>Sales</span>
+          <span>Showroom</span>
         </Link>
         <Link href="/settings" className="bottom-nav-item">
           <span className="icon">⚙️</span>

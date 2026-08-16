@@ -11,27 +11,28 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email", placeholder: "user@example.com" },
-        password: { label: "Password", type: "password" }
+        id: { label: "User ID", type: "text" },
+        employeeId: { label: "Employee ID", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        if (!credentials?.id || !credentials?.employeeId) {
           return null;
         }
 
         const user = await prisma.user.findUnique({
           where: {
-            email: credentials.email
+            id: credentials.id
           }
         });
 
-        // Use proper hashing (e.g. bcrypt) for production passwords!
-        if (user && user.password === credentials.password) {
+        // Simple match on employeeId (treat as password based on Sales 360 mechanism)
+        if (user && user.employeeId === credentials.employeeId) {
           return {
             id: user.id,
             name: user.name,
-            email: user.email,
-            role: user.role
+            role: user.role,
+            area: user.area,
+            employeeId: user.employeeId
           };
         }
 
@@ -44,6 +45,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = (user as any).role;
         token.id = user.id;
+        token.area = (user as any).area;
+        token.employeeId = (user as any).employeeId;
       }
       return token;
     },
@@ -51,12 +54,17 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).role = token.role;
         (session.user as any).id = token.id;
+        (session.user as any).area = token.area;
+        (session.user as any).employeeId = token.employeeId;
       }
       return session;
     }
   },
   session: {
     strategy: "jwt"
+  },
+  pages: {
+    signIn: "/login",
   }
 };
 

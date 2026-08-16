@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x"]
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "debian-openssl-1.1.x"]
 }
 
 datasource db {
@@ -8,7 +8,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// -----------------------------------------
 // NextAuth Models
+// -----------------------------------------
 
 model Account {
   id                 String  @id @default(cuid())
@@ -37,99 +39,146 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-// Application Models
+// -----------------------------------------
+// Application Enums
+// -----------------------------------------
 
 enum Role {
   SUPER_ADMIN
-  ADMIN
-  SALES
-  SOURCING
-  ACCOUNTS
+  RECOVERY_TEAM
+  RECOVERY_MANAGER
+  SERVICE_ENGINEER
+  SERVICE_HEAD
+  REGISTRATION_TEAM
+  SR_EXECUTIVE
+  AGM_DGM
+  GM_SR_GM
+  SALES_TEAM
 }
+
+enum VehicleStatus {
+  CAPTURED
+  ASSESSMENT_PENDING
+  CN_REQUESTED
+  CN_APPROVED
+  COST_ANALYSIS_SUBMITTED
+  REPAIR_APPROVED
+  REGISTRATION_COST_ADDED
+  SOP_COST_ADDED
+  PRICE_APPROVED
+  LIVE_FOR_RESALE
+  SOLD
+}
+
+enum LetterStatus {
+  LETTER_1
+  LETTER_2
+  LETTER_3
+  WRITTEN
+  RELEASED
+  REQ_CN
+}
+
+// -----------------------------------------
+// Core Models
+// -----------------------------------------
 
 model User {
   id            String    @id @default(cuid())
   name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
+  staffId       String?   @unique
+  employeeId    String?   @unique // Retained for backwards compatibility if needed
   password      String?   
-  role          Role      @default(SALES)
+  area          String?
+  role          Role      @default(RECOVERY_TEAM)
   
   accounts      Account[]
   sessions      Session[]
 
   // Relations
-  vehiclesSourced Vehicle[] @relation("SourcedVehicles")
-  vehiclesSold    Vehicle[] @relation("SoldVehicles")
-}
-
-enum VehicleStatus {
-  SOURCED
-  IN_TRANSIT
-  IN_REPAIR
-  AVAILABLE_FOR_SALE
-  SOLD
-  RESERVED
+  vehiclesCaptured  Vehicle[] @relation("CapturedVehicles")
+  vehiclesAssessed  Vehicle[] @relation("AssessedVehicles")
 }
 
 model Vehicle {
   id              String        @id @default(cuid())
-  make            String
-  model           String
-  year            Int
-  vin             String        @unique
-  status          VehicleStatus @default(SOURCED)
-  purchasePrice   Float
-  sellingPrice    Float?
-  color           String?
-  mileage         Int?
+  customerCode    String?
+  customerName    String?
+  make            String?
+  model           String?
+  year            Int?
+  registrationNo  String?       @unique
+  mileage         String?
+  territory       String?
+  status          VehicleStatus @default(CAPTURED)
   
-  // Timestamps
+  captureDate     DateTime      @default(now())
+  capturedLoc     String?
+  currentLoc      String?
+  letterStatus    LetterStatus?
+  
+  repairDeadline  DateTime?
+  deadlineFlagged Boolean       @default(false)
+  
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  // Foreign keys
-  sourcedById     String?
-  soldById        String?
-
-  // Relations
-  sourcedBy       User?         @relation("SourcedVehicles", fields: [sourcedById], references: [id])
-  soldBy          User?         @relation("SoldVehicles", fields: [soldById], references: [id])
+  // Approvers / Handlers
+  capturedById    String?
+  capturedBy      User?         @relation("CapturedVehicles", fields: [capturedById], references: [id])
   
-  images          VehicleImage[]
+  assignedEngineerId String?
+  assignedEngineer User?        @relation("AssessedVehicles", fields: [assignedEngineerId], references: [id])
+
+  // Sub-models
+  documents       VehicleDocument?
+  media           VehicleMedia[]
   costAnalysis    CostAnalysis?
 }
 
-model VehicleImage {
-  id        String   @id @default(cuid())
-  url       String
-  vehicleId String
-  createdAt DateTime @default(now())
+model VehicleDocument {
+  id                      String   @id @default(cuid())
+  vehicleId               String   @unique
+  hasRegistrationCert     Boolean  @default(false)
+  remarks                 String?  @db.Text
+  
+  vehicle                 Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
 
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+model VehicleMedia {
+  id           String   @id @default(cuid())
+  vehicleId    String
+  url          String
+  type         String   // e.g., 'FRONT', 'BACK', 'LEFT', 'RIGHT', 'CABIN', 'SLEEP', 'ASSESSMENT'
+  uploadedAt   DateTime @default(now())
+
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model CostAnalysis {
-  id             String   @id @default(cuid())
-  vehicleId      String   @unique
-  repairCosts    Float    @default(0)
-  transportCosts Float    @default(0)
-  otherCosts     Float    @default(0)
-  totalCost      Float    @default(0)
-  estimatedProfit Float?
-  actualProfit    Float?
+  id                String   @id @default(cuid())
+  vehicleId         String   @unique
+  
+  // Service Engineer inputs
+  repairCosts       Float    @default(0)
+  transportCosts    Float    @default(0)
+  otherCosts        Float    @default(0)
+  
+  // Registration Team inputs
+  registrationCost  Float    @default(0)
+  
+  // Sr. Executive inputs
+  sopCost           Float    @default(0)
+  
+  // Approvals
+  isRepairApproved  Boolean  @default(false)
+  
+  // Final Pricing
+  proposedPrice     Float?
+  approvedPrice     Float?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle           Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
