@@ -3,6 +3,7 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/cvacimot/public_html/resale
     - /bin/cp -R * $DEPLOYPATH
+    - /bin/cp -R .next $DEPLOYPATH
     - cd $DEPLOYPATH
     - npm install
     - npx prisma generate
