@@ -8,3 +8,5 @@ deployment:
     - npx prisma generate
     - npx prisma db push
     - npm run build
+    - mkdir -p tmp
+    - touch tmp/restart.txt
