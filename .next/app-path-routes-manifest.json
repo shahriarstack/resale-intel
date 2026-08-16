@@ -1,8 +1,23 @@
 {
+  "/(app)/admin/users/page": "/admin/users",
+  "/(app)/capture/page": "/capture",
+  "/(app)/inventory/page": "/inventory",
   "/(app)/page": "/",
+  "/(app)/sales/page": "/sales",
+  "/(app)/vehicles/[id]/page": "/vehicles/[id]",
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
   "/api/auth/[...nextauth]/route": "/api/auth/[...nextauth]",
+  "/api/capture/route": "/api/capture",
+  "/api/migrate/route": "/api/migrate",
+  "/api/seed-users/route": "/api/seed-users",
+  "/api/upload/route": "/api/upload",
+  "/api/users/[id]/route": "/api/users/[id]",
+  "/api/users/route": "/api/users",
+  "/api/vehicles/[id]/assessment/route": "/api/vehicles/[id]/assessment",
+  "/api/vehicles/[id]/costs/route": "/api/vehicles/[id]/costs",
+  "/api/vehicles/[id]/route": "/api/vehicles/[id]",
+  "/api/vehicles/route": "/api/vehicles",
   "/favicon.ico/route": "/favicon.ico",
   "/login/page": "/login"
 }

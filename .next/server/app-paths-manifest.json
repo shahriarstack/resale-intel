@@ -1,8 +1,23 @@
 {
+  "/(app)/admin/users/page": "app/(app)/admin/users/page.js",
+  "/(app)/capture/page": "app/(app)/capture/page.js",
+  "/(app)/inventory/page": "app/(app)/inventory/page.js",
   "/(app)/page": "app/(app)/page.js",
+  "/(app)/sales/page": "app/(app)/sales/page.js",
+  "/(app)/vehicles/[id]/page": "app/(app)/vehicles/[id]/page.js",
   "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/capture/route": "app/api/capture/route.js",
+  "/api/migrate/route": "app/api/migrate/route.js",
+  "/api/seed-users/route": "app/api/seed-users/route.js",
+  "/api/upload/route": "app/api/upload/route.js",
+  "/api/users/[id]/route": "app/api/users/[id]/route.js",
+  "/api/users/route": "app/api/users/route.js",
+  "/api/vehicles/[id]/assessment/route": "app/api/vehicles/[id]/assessment/route.js",
+  "/api/vehicles/[id]/costs/route": "app/api/vehicles/[id]/costs/route.js",
+  "/api/vehicles/[id]/route": "app/api/vehicles/[id]/route.js",
+  "/api/vehicles/route": "app/api/vehicles/route.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
   "/login/page": "app/login/page.js"
 }

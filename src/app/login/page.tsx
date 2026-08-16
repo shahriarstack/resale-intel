@@ -26,9 +26,9 @@ export default function LoginPage() {
     fetch('/api/users')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
-          setUsers(data);
-          setFilteredUsers(data);
+        if (data.success && Array.isArray(data.data)) {
+          setUsers(data.data);
+          setFilteredUsers(data.data);
         }
       })
       .catch(err => console.error("Failed to load users", err));
