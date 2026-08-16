@@ -4,10 +4,5 @@ deployment:
     - export DEPLOYPATH=/home/cvacimot/public_html/resale
     - /bin/cp -R * $DEPLOYPATH
     - /bin/cp -R .next $DEPLOYPATH
-    - cd $DEPLOYPATH
-    - npm install
-    - npx prisma generate
-    - npx prisma db push
-    - npm run build
-    - mkdir -p tmp
-    - touch tmp/restart.txt
+    - mkdir -p $DEPLOYPATH/tmp
+    - touch $DEPLOYPATH/tmp/restart.txt
