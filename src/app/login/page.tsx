@@ -80,7 +80,7 @@ export default function LoginPage() {
             <span className="sales360-brand-accent">Intel</span>
           </h1>
           <p className="sales360-brand-subtitle">
-            Intelligent lifecycle tracking, recovery management, and profitability analysis.
+            Commercial vehicle recovery & resale management for Foton and Mahindra.
           </p>
         </div>
       </div>

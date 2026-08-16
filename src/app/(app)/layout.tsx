@@ -19,9 +19,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <h2>Resale Intel</h2>
         </div>
         <nav className="sidebar-nav">
-          <Link href="/" className="nav-item">Dashboard</Link>
+          <Link href="/" className="nav-item">Recovery Dashboard</Link>
           <Link href="/capture" className="nav-item">Capture Vehicle</Link>
-          <Link href="/inventory" className="nav-item">Vehicles</Link>
+          <Link href="/inventory" className="nav-item">Seized Vehicles</Link>
           <Link href="/sales" className="nav-item">Sales Showroom</Link>
           {(session.user as any)?.role === 'SUPER_ADMIN' && (
             <Link href="/admin/users" className="nav-item">User Management</Link>
@@ -42,16 +42,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {/* Mobile Bottom Navigation */}
       <nav className="bottom-nav">
         <Link href="/" className="bottom-nav-item">
-          <span className="icon">📊</span>
-          <span>Home</span>
+          <span className="icon">🏠</span>
+          <span>Recovery</span>
         </Link>
         <Link href="/capture" className="bottom-nav-item">
           <span className="icon">📷</span>
           <span>Capture</span>
         </Link>
         <Link href="/inventory" className="bottom-nav-item">
-          <span className="icon">📦</span>
-          <span>Vehicles</span>
+          <span className="icon">📋</span>
+          <span>Seized</span>
         </Link>
         <Link href="/sales" className="bottom-nav-item">
           <span className="icon">💰</span>
@@ -59,7 +59,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </Link>
         <Link href="/settings" className="bottom-nav-item">
           <span className="icon">⚙️</span>
-          <span>Menu</span>
+          <span>Settings</span>
         </Link>
       </nav>
     </div>
