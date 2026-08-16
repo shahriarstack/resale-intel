@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth Models
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Application Models
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  SALES
+  SOURCING
+  ACCOUNTS
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   
+  role          Role      @default(SALES)
+  
+  accounts      Account[]
+  sessions      Session[]
+
+  // Relations
+  vehiclesSourced Vehicle[] @relation("SourcedVehicles")
+  vehiclesSold    Vehicle[] @relation("SoldVehicles")
+}
+
+enum VehicleStatus {
+  SOURCED
+  IN_TRANSIT
+  IN_REPAIR
+  AVAILABLE_FOR_SALE
+  SOLD
+  RESERVED
+}
+
+model Vehicle {
+  id              String        @id @default(cuid())
+  make            String
+  model           String
+  year            Int
+  vin             String        @unique
+  status          VehicleStatus @default(SOURCED)
+  purchasePrice   Float
+  sellingPrice    Float?
+  color           String?
+  mileage         Int?
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Foreign keys
+  sourcedById     String?
+  soldById        String?
+
+  // Relations
+  sourcedBy       User?         @relation("SourcedVehicles", fields: [sourcedById], references: [id])
+  soldBy          User?         @relation("SoldVehicles", fields: [soldById], references: [id])
+  
+  images          VehicleImage[]
+  costAnalysis    CostAnalysis?
+}
+
+model VehicleImage {
+  id        String   @id @default(cuid())
+  url       String
+  vehicleId String
+  createdAt DateTime @default(now())
+
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model CostAnalysis {
+  id             String   @id @default(cuid())
+  vehicleId      String   @unique
+  repairCosts    Float    @default(0)
+  transportCosts Float    @default(0)
+  otherCosts     Float    @default(0)
+  totalCost      Float    @default(0)
+  estimatedProfit Float?
+  actualProfit    Float?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
