@@ -161,7 +161,7 @@ table {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 14px;
   padding-bottom: calc(var(--bottom-nav-height) + 16px); /* account for bottom nav on mobile */
 }
 
@@ -532,7 +532,7 @@ table {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 16px;
+  padding: 14px;
   border-radius: 14px;
   margin-top: 8px;
   transition: all 0.2s ease;
@@ -674,7 +674,7 @@ table {
 .modal-content {
   background: var(--surface);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 2rem;
   width: 100%;
   max-width: 500px;
@@ -1111,4 +1111,47 @@ table {
   font-size: 1.5rem;
   font-weight: 700;
   color: #4ade80;
+}
+
+
+
+@layer components {
+  /* ---- Aura UI Glass & Motion ---- */
+  .aura-glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); border: 1px solid rgba(0, 0, 0, 0.04); box-shadow: 0 4px 24px rgba(0, 0, 0, 0.02), inset 0 0 0 1px rgba(255, 255, 255, 0.5); }
+  .aura-glass-strong { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(32px) saturate(200%); -webkit-backdrop-filter: blur(32px) saturate(200%); border: 1px solid rgba(0, 0, 0, 0.05); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.03), inset 0 0 0 1px rgba(255, 255, 255, 0.6); }
+  .aura-glow { position: relative; }
+  .aura-glow::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 20px 4px var(--accent-soft); opacity: 0; transition: opacity 0.3s; z-index: -1; }
+  .aura-glow:hover::after { opacity: 1; }
+  .aura-float { animation: floatAura 6s ease-in-out infinite; }
+}
+
+@keyframes floatAura {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@layer components {
+  /* Generic Premium Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    overflow: hidden;
+  }
+
+  /* Premium Apple/Stripe Stat Tile */
+  .stat-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--tint-from), var(--tint-to));
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    overflow: hidden;
+  }
 }

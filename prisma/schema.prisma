@@ -1,6 +1,11 @@
+// Resale Intel — data model
+// Commercial vehicle recovery → refurbishment → resale-ready pipeline.
+// One vehicle passes through eight approving desks; status and letter stage
+// are separate axes; every transition and edit is written to VehicleEvent.
+
 generator client {
-  provider = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x", "debian-openssl-1.1.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -8,177 +13,358 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// -----------------------------------------
-// NextAuth Models
-// -----------------------------------------
-
-model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// -----------------------------------------
-// Application Enums
-// -----------------------------------------
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
 
 enum Role {
   SUPER_ADMIN
-  RECOVERY_TEAM
-  RECOVERY_MANAGER
-  SERVICE_ENGINEER
-  SERVICE_HEAD
-  REGISTRATION_TEAM
-  SR_EXECUTIVE
-  AGM_DGM
-  GM_SR_GM
-  SALES_TEAM
+  RECOVERY_TEAM // ARO / Sr. ARO — mobile
+  RECOVERY_MANAGER // DM / AM — desktop
+  SERVICE_ENGINEER // SE / Sr. SE — mobile
+  SERVICE_HEAD // HQ — desktop
+  REGISTRATION_TEAM // LO / Sr. LO / AM — desktop
+  SR_EXECUTIVE // Sr. Ex — desktop
+  AGM_DGM // desktop
+  GM_SR_GM // desktop
+  SALES_TEAM // MO / Sr. MO / TM / Sr. TM / AM — mobile, read-only
 }
 
+// The status axis: where the file sits in the eight-desk chain.
 enum VehicleStatus {
-  CAPTURED
-  ASSESSMENT_PENDING
-  CN_REQUESTED
-  CN_APPROVED
-  COST_ANALYSIS_SUBMITTED
-  REPAIR_APPROVED
-  REGISTRATION_COST_ADDED
-  SOP_COST_ADDED
-  PRICE_APPROVED
-  LIVE_FOR_RESALE
-  SOLD
+  CAPTURED // held by Recovery Team
+  RELEASED // TERMINAL — customer settled, vehicle returned
+  CN_REQUESTED // held by Recovery Manager
+  CN_APPROVED // held by Service Engineer
+  COST_SUBMITTED // held by Service Head
+  REPAIR_APPROVED // held by Registration Team — countdown live
+  REGISTRATION_DONE // held by Sr. Executive
+  SOP_ADDED // held by AGM / DGM
+  PRICE_APPROVED // held by GM / Sr. GM
+  LIVE_FOR_RESALE // on the resale marketplace — sales officers may bid
+  SOLD // TERMINAL — a winning bid was awarded
 }
 
-enum LetterStatus {
+// The letter axis: the escalation ladder, independent of status.
+enum LetterStage {
+  NONE
   LETTER_1
   LETTER_2
   LETTER_3
   WRITTEN
-  RELEASED
-  REQ_CN
 }
 
-// -----------------------------------------
-// Core Models
-// -----------------------------------------
+enum PhotoSlot {
+  LEFT
+  RIGHT
+  FRONT
+  BACK
+  CABIN
+  SLEEP
+  ASSESSMENT_SHEET
+  REGISTRATION_DOC
+}
+
+enum LocationType {
+  YARD
+  DEPOT
+  SHOWROOM
+  OTHER
+}
+
+// Condition grade set by the Sr. Executive.
+enum VehicleGrade {
+  A // Excellent
+  B // Good
+  C // Average
+  D // Salvage
+}
+
+// The audit vocabulary. Every row in VehicleEvent names one of these.
+enum EventType {
+  CAPTURED
+  FIELD_EDITED
+  LETTER_UPDATED
+  ENGINEER_ASSIGNED
+  RELEASED
+  CN_REQUESTED
+  CN_APPROVED
+  CN_DECLINED
+  ASSESSMENT_SUBMITTED
+  REPAIR_APPROVED
+  REPAIR_SENT_BACK
+  REGISTRATION_COMPLETED
+  SOP_SET
+  SOP_UPDATED
+  GRADED
+  PRICE_SET
+  PRICE_APPROVED
+  PRICE_REVISED
+  PUSHED_LIVE
+  SENT_BACK
+  LOCKED
+  UNLOCKED
+  BID_PLACED
+  SALE_AWARDED
+}
+
+// ---------------------------------------------------------------------------
+// Users & master data
+// ---------------------------------------------------------------------------
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  staffId       String?   @unique
-  employeeId    String?   @unique // Retained for backwards compatibility if needed
-  password      String?   
-  area          String?
-  role          Role      @default(RECOVERY_TEAM)
-  
-  accounts      Account[]
-  sessions      Session[]
+  id           String  @id @default(cuid())
+  name         String
+  staffId      String  @unique // login handle, e.g. "ARO-014"
+  designation  String? // "ARO", "Sr. ARO", "DM" — free text within a role
+  role         Role    @default(RECOVERY_TEAM)
+  passwordHash String
+  isActive     Boolean @default(true)
 
-  // Relations
-  vehiclesCaptured  Vehicle[] @relation("CapturedVehicles")
-  vehiclesAssessed  Vehicle[] @relation("AssessedVehicles")
+  territoryId String?
+  territory   Territory? @relation(fields: [territoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehiclesCaptured Vehicle[]        @relation("CapturedVehicles")
+  vehiclesAssigned Vehicle[]        @relation("AssignedEngineer")
+  events           VehicleEvent[]
+  photosUploaded   VehiclePhoto[]
+  repairLines      RepairCostLine[]
+  regLines         RegistrationCostLine[]
+  bids             Bid[]
+
+  @@index([role])
+  @@index([isActive])
 }
+
+model Territory {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  code     String?
+  isActive Boolean @default(true)
+
+  users    User[]
+  vehicles Vehicle[]
+}
+
+model Location {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  type     LocationType @default(YARD)
+  isActive Boolean      @default(true)
+
+  vehicles Vehicle[]
+}
+
+// Admin-managed capture checklist. "Registration Certificate: Yes/No" is one seed row.
+model DocumentQuestion {
+  id           String  @id @default(cuid())
+  key          String  @unique // stable machine key, e.g. "REG_CERT"
+  label        String
+  requiresNote Boolean @default(false)
+  sortOrder    Int     @default(0)
+  isActive     Boolean @default(true)
+
+  answers DocumentAnswer[]
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle
+// ---------------------------------------------------------------------------
 
 model Vehicle {
-  id              String        @id @default(cuid())
-  customerCode    String?
-  customerName    String?
-  make            String?
-  model           String?
-  year            Int?
-  registrationNo  String?       @unique
-  mileage         String?
-  territory       String?
+  id             String        @id @default(cuid())
+  registrationNo String        @unique
+  customerName   String
+  customerCode   String?
+  make           String?
+  model          String?
+  year           Int?
+  mileage        String?
+
   status          VehicleStatus @default(CAPTURED)
-  
-  captureDate     DateTime      @default(now())
-  capturedLoc     String?
-  currentLoc      String?
-  letterStatus    LetterStatus?
-  
-  repairDeadline  DateTime?
-  deadlineFlagged Boolean       @default(false)
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  letterStage     LetterStage   @default(NONE)
+  grade           VehicleGrade? // condition grade set by Sr. Executive
+  isLocked        Boolean       @default(false) // set when Letter 3 / Written issued
+  hasSleeperCabin Boolean       @default(false)
+  remarks         String?       @db.Text
 
-  // Approvers / Handlers
-  capturedById    String?
-  capturedBy      User?         @relation("CapturedVehicles", fields: [capturedById], references: [id])
-  
+  territoryId       String?
+  territory         Territory? @relation(fields: [territoryId], references: [id], onDelete: SetNull)
+  currentLocationId String?
+  currentLocation   Location?  @relation(fields: [currentLocationId], references: [id], onDelete: SetNull)
+  capturedLocation  String? // free text — where the seizure happened
+  captureDate       DateTime   @default(now())
+
+  capturedById String?
+  capturedBy   User?   @relation("CapturedVehicles", fields: [capturedById], references: [id], onDelete: SetNull)
+
   assignedEngineerId String?
-  assignedEngineer User?        @relation("AssessedVehicles", fields: [assignedEngineerId], references: [id])
+  assignedEngineer   User?   @relation("AssignedEngineer", fields: [assignedEngineerId], references: [id], onDelete: SetNull)
 
-  // Sub-models
-  documents       VehicleDocument?
-  media           VehicleMedia[]
-  costAnalysis    CostAnalysis?
+  // Repair timeframe set by Service Head → drives the countdown / overdue tracker.
+  repairDeadline DateTime?
+
+  // Resale outcome. winningBidId is a plain column, not a relation: a foreign
+  // key back into Bid would form a cycle with Bid.vehicleId and block deletes.
+  soldAt       DateTime?
+  winningBidId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  costing      Costing?
+  photos       VehiclePhoto[]
+  answers      DocumentAnswer[]
+  repairLines  RepairCostLine[]
+  regLines     RegistrationCostLine[]
+  events       VehicleEvent[]
+  bids         Bid[]
+
+  @@index([status])
+  @@index([letterStage])
+  @@index([capturedById])
+  @@index([assignedEngineerId])
+  @@index([territoryId])
+  @@index([repairDeadline])
 }
 
-model VehicleDocument {
-  id                      String   @id @default(cuid())
-  vehicleId               String   @unique
-  hasRegistrationCert     Boolean  @default(false)
-  remarks                 String?  @db.Text
-  
-  vehicle                 Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+model DocumentAnswer {
+  id         String  @id @default(cuid())
+  vehicleId  String
+  questionId String
+  answer     Boolean @default(false)
+  note       String? @db.Text
+
+  vehicle  Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  question DocumentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, questionId])
 }
 
-model VehicleMedia {
-  id           String   @id @default(cuid())
+model VehiclePhoto {
+  id           String    @id @default(cuid())
   vehicleId    String
+  slot         PhotoSlot
   url          String
-  type         String   // e.g., 'FRONT', 'BACK', 'LEFT', 'RIGHT', 'CABIN', 'SLEEP', 'ASSESSMENT'
-  uploadedAt   DateTime @default(now())
+  uploadedById String?
+  uploadedAt   DateTime  @default(now())
 
-  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle    Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId])
 }
 
-model CostAnalysis {
-  id                String   @id @default(cuid())
-  vehicleId         String   @unique
-  
-  // Service Engineer inputs
-  repairCosts       Float    @default(0)
-  transportCosts    Float    @default(0)
-  otherCosts        Float    @default(0)
-  
-  // Registration Team inputs
-  registrationCost  Float    @default(0)
-  
-  // Sr. Executive inputs
-  sopCost           Float    @default(0)
-  
-  // Approvals
-  isRepairApproved  Boolean  @default(false)
-  
-  // Final Pricing
-  proposedPrice     Float?
-  approvedPrice     Float?
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+// ---------------------------------------------------------------------------
+// Costing — one row per vehicle; line items roll up into it.
+// ---------------------------------------------------------------------------
 
-  vehicle           Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+model Costing {
+  id        String @id @default(cuid())
+  vehicleId String @unique
+
+  transportCost Float @default(0)
+  otherCost     Float @default(0)
+
+  // Single editable SOP figure, revised monthly. History lives in VehicleEvent.
+  sopCost        Float     @default(0)
+  sopUpdatedAt   DateTime?
+  sopUpdatedById String?
+
+  approvedPrice Float?
+  priceSetById  String?
+  priceSetAt    DateTime?
+
+  repairDays         Int?
+  repairApprovedById String?
+  repairApprovedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model RepairCostLine {
+  id          String @id @default(cuid())
+  vehicleId   String
+  description String
+  amount      Float  @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId])
+}
+
+model RegistrationCostLine {
+  id          String @id @default(cuid())
+  vehicleId   String
+  description String
+  amount      Float  @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId])
+}
+
+// ---------------------------------------------------------------------------
+// Resale bidding
+//
+// Sealed bids: a sales officer sees only their own. Every bid is kept, so the
+// trail of who offered what and when survives. An officer's standing offer is
+// their most recent bid — re-bidding lower is allowed so typos can be fixed.
+// ---------------------------------------------------------------------------
+
+model Bid {
+  id        String   @id @default(cuid())
+  vehicleId String
+  bidderId  String
+  amount    Float
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  bidder  User    @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([bidderId])
+  @@index([vehicleId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Audit spine
+// ---------------------------------------------------------------------------
+
+model VehicleEvent {
+  id        String    @id @default(cuid())
+  vehicleId String
+  actorId   String?
+  type      EventType
+
+  fromStatus VehicleStatus?
+  toStatus   VehicleStatus?
+
+  field    String? // for FIELD_EDITED / SOP_UPDATED / PRICE_REVISED
+  oldValue String? @db.Text
+  newValue String? @db.Text
+  note     String? @db.Text // decline / send-back reasons
+
+  createdAt DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId])
+  @@index([actorId])
+  @@index([type])
+  @@index([createdAt])
 }

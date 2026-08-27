@@ -14,8 +14,9 @@
 /coverage
 
 # next.js
-# /.next/
+/.next/
 /out/
+/standalone.zip
 
 # production
 /build
@@ -32,6 +33,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+*.env
+server.env
+update_env.ps1
+
+# IDE / agent files
+.claude/
+.claude-launch-note.txt
 
 # vercel
 .vercel
@@ -39,3 +47,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# uploaded evidence (served from outside web root)
+/uploads/

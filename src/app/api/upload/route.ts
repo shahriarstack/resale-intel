@@ -1,48 +1,37 @@
-import { NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
+import { randomUUID } from "node:crypto";
+import path from "node:path";
+import fs from "node:fs/promises";
+import { ok, fail, withGuard } from "@/lib/api";
+import { requireUser } from "@/lib/session";
+import {
+  ensureUploadDir,
+  ALLOWED_IMAGE_TYPES,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/storage";
 
-export async function POST(request: Request) {
-  try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const type = formData.get('type') as string;
+export const runtime = "nodejs";
 
-    if (!file) {
-      return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
-    }
+// Authenticated image upload. Type and size validated; extension derived from
+// the sniffed MIME, never the client filename. Returns a stored name; the file
+// is served back through /api/files/[name].
+export const POST = withGuard(async (request: Request) => {
+  await requireUser();
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    
-    // We will save to public/uploads directory.
-    // In a production environment with standalone mode, you may want to configure 
-    // persistent storage outside the deployment folder or use a cloud provider.
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    
-    // Ensure the uploads directory exists
-    try {
-      await fs.access(uploadsDir);
-    } catch {
-      await fs.mkdir(uploadsDir, { recursive: true });
-    }
+  const form = await request.formData();
+  const file = form.get("file");
+  if (!(file instanceof File)) return fail("No file provided", 400);
 
-    // Generate unique filename
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const filename = `${type || 'media'}-${uniqueSuffix}${path.extname(file.name)}`;
-    const filePath = path.join(uploadsDir, filename);
+  const ext = ALLOWED_IMAGE_TYPES[file.type];
+  if (!ext) return fail("Only JPEG, PNG or WebP images are allowed", 415);
+  if (file.size > MAX_UPLOAD_BYTES) return fail("Image exceeds the 8 MB limit", 413);
+  if (file.size === 0) return fail("Image is empty", 400);
 
-    // Save the file
-    await fs.writeFile(filePath, buffer);
+  const dir = await ensureUploadDir();
+  const name = `${randomUUID()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  // Uploads live outside the project; opt this write out of build tracing so
+  // Turbopack doesn't bundle the whole source tree into the server output.
+  await fs.writeFile(path.join(/*turbopackIgnore: true*/ dir, name), buffer);
 
-    // Return the public URL for the file
-    return NextResponse.json({ 
-      success: true, 
-      url: `/uploads/${filename}`,
-      filename: filename
-    });
-
-  } catch (error: any) {
-    console.error('Upload Error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
+  return ok({ name, url: `/api/files/${name}` }, 201);
+});

@@ -1,51 +1,108 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { ok, fail, withGuard } from "@/lib/api";
+import { requireUser } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
+import { letterUpdateSchema } from "@/lib/validation";
+import { canEditCapture, letterLocksRecord } from "@/lib/rbac";
+import { recordEvent } from "@/lib/audit";
+import { letterLabel } from "@/lib/status";
 
-const prisma = new PrismaClient();
-
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  try {
+// Read one vehicle with everything the detail view needs.
+export const GET = withGuard(
+  async (_request: Request, context: { params: Promise<{ id: string }> }) => {
+    await requireUser();
     const { id } = await context.params;
-    
     const vehicle = await prisma.vehicle.findUnique({
       where: { id },
       include: {
-        capturedBy: { select: { name: true } },
-        assignedEngineer: { select: { name: true } },
-        media: true,
-        documents: true,
-        costAnalysis: true
-      }
+        capturedBy: { select: { name: true, staffId: true } },
+        assignedEngineer: { select: { name: true, staffId: true } },
+        territory: { select: { name: true } },
+        currentLocation: { select: { name: true } },
+        photos: true,
+        answers: { include: { question: true } },
+        costing: true,
+        repairLines: true,
+        regLines: true,
+        events: {
+          orderBy: { createdAt: "desc" },
+          include: { actor: { select: { name: true } } },
+        },
+      },
     });
+    if (!vehicle) return fail("Vehicle not found", 404);
+    return ok(vehicle);
+  },
+);
 
-    if (!vehicle) {
-      return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
+// ARO inline edits: advance the letter stage and/or (re)assign the engineer.
+// Advancing to Letter 3 / Written locks the capture record.
+export const PATCH = withGuard(
+  async (request: Request, context: { params: Promise<{ id: string }> }) => {
+    const user = await requireUser();
+    const { id } = await context.params;
+    const input = letterUpdateSchema.parse(await request.json());
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        isLocked: true,
+        capturedById: true,
+        letterStage: true,
+        assignedEngineerId: true,
+      },
+    });
+    if (!vehicle) return fail("Vehicle not found", 404);
+
+    if (!canEditCapture(user.role, vehicle, user.id)) {
+      return fail("This record can no longer be edited", 403);
     }
 
-    return NextResponse.json({ success: true, data: vehicle });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
+    const updated = await prisma.$transaction(async (tx) => {
+      const data: {
+        letterStage?: typeof vehicle.letterStage;
+        isLocked?: boolean;
+        assignedEngineerId?: string;
+      } = {};
 
-// Global update route for changing status, SLA, etc.
-export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await context.params;
-    const body = await request.json();
-    
-    const updateData: any = {};
-    if (body.status) updateData.status = body.status;
-    if (body.repairDeadline) updateData.repairDeadline = new Date(body.repairDeadline);
-    if (body.deadlineFlagged !== undefined) updateData.deadlineFlagged = body.deadlineFlagged;
+      if (input.letterStage && input.letterStage !== vehicle.letterStage) {
+        data.letterStage = input.letterStage;
+        if (letterLocksRecord(input.letterStage)) data.isLocked = true;
+      }
+      if (input.assignedEngineerId && input.assignedEngineerId !== vehicle.assignedEngineerId) {
+        data.assignedEngineerId = input.assignedEngineerId;
+      }
 
-    const vehicle = await prisma.vehicle.update({
-      where: { id },
-      data: updateData
+      const v = await tx.vehicle.update({
+        where: { id },
+        data,
+        select: { id: true, letterStage: true, isLocked: true, assignedEngineerId: true },
+      });
+
+      if (data.letterStage) {
+        await recordEvent(tx, {
+          vehicleId: id,
+          actorId: user.id,
+          type: "LETTER_UPDATED",
+          field: "letterStage",
+          oldValue: letterLabel(vehicle.letterStage),
+          newValue: letterLabel(input.letterStage!),
+        });
+      }
+      if (data.assignedEngineerId) {
+        await recordEvent(tx, {
+          vehicleId: id,
+          actorId: user.id,
+          type: "ENGINEER_ASSIGNED",
+          field: "assignedEngineerId",
+          newValue: data.assignedEngineerId,
+        });
+      }
+
+      return v;
     });
 
-    return NextResponse.json({ success: true, data: vehicle });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
+    return ok(updated);
+  },
+);
