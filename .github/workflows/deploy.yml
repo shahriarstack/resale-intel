@@ -47,31 +47,18 @@ jobs:
           cp -r .next/static .deploy/.next/static
           cp -r public .deploy/public
           
-          # Create lightweight cpanel deploy script
-          cat << 'EOF' > .deploy/.cpanel.yml
-          ---
-          deployment:
-            tasks:
-              - export DEPLOYPATH=/home/cvacimot/public_html/resale.cv-acimotors.com
-              - /bin/cp -a * $DEPLOYPATH/
-              - /bin/cp -a .next $DEPLOYPATH/
-              - mkdir -p $DEPLOYPATH/tmp
-              - touch $DEPLOYPATH/tmp/restart.txt
-          EOF
+          # Create passenger restart file so cPanel reboots the app automatically
+          mkdir -p .deploy/tmp
+          touch .deploy/tmp/restart.txt
 
-      - name: Force Push Build to cpanel-deploy Branch
-        run: |
-          cd .deploy
-          git init
-          git config user.name "GitHub Actions Deployer"
-          git config user.email "actions@github.com"
-          git add .
-          git commit -m "Deploy build to cPanel"
-          git push --force "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/cpanel-deploy
-
-      - name: Trigger cPanel to Pull cpanel-deploy Branch
-        run: |
-          curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
-          "https://116.202.222.251:2083/execute/VersionControl/update?repository_root=/home/cvacimot/repositories/resale&branch=cpanel-deploy" -k
-          curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
-          "https://116.202.222.251:2083/execute/VersionControlDeployment/create?repository_root=/home/cvacimot/repositories/resale" -k
+      - name: Deploy to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: 116.202.222.251
+          username: ${{ secrets.CPANEL_USER }}
+          password: ${{ secrets.CPANEL_PASS }}
+          local-dir: ./.deploy/
+          server-dir: /public_html/resale.cv-acimotors.com/
+          exclude: |
+            **/.git*
+            **/.git*/**
