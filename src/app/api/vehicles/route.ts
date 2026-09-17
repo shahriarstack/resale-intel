@@ -1,6 +1,6 @@
 import type { Prisma, VehicleStatus } from "@prisma/client";
 import { ok, fail, withGuard } from "@/lib/api";
-import { requireRole, requireUser } from "@/lib/session";
+import { requireRole, requireStaff } from "@/lib/session";
 import { territoryDenied } from "@/lib/postings";
 import { prisma } from "@/lib/prisma";
 import { captureSchema } from "@/lib/validation";
@@ -244,7 +244,7 @@ export const POST = withGuard(async (request: Request) => {
 
 // List vehicles, scoped by role. Field roles see only their own files.
 export const GET = withGuard(async (request: Request) => {
-  const user = await requireUser();
+  const user = await requireStaff();
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const q = searchParams.get("q")?.trim();

@@ -1,5 +1,5 @@
 import { ok, fail, withGuard } from "@/lib/api";
-import { requireUser } from "@/lib/session";
+import { requireStaff, requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { letterUpdateSchema } from "@/lib/validation";
 import { canEditCapture, canViewCosts, letterLocksRecord } from "@/lib/rbac";
@@ -10,7 +10,7 @@ import { canIssueLetter, dateFieldForStage } from "@/lib/letterSchedule";
 // Read one vehicle with everything the detail view needs.
 export const GET = withGuard(
   async (_request: Request, context: { params: Promise<{ id: string }> }) => {
-    const user = await requireUser();
+    const user = await requireStaff();
     const { id } = await context.params;
     const vehicle = await prisma.vehicle.findUnique({
       where: { id },

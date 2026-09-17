@@ -1,5 +1,5 @@
 import { ok, withGuard } from "@/lib/api";
-import { requireUser } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { getDeskHistory, DESK_DECISIONS } from "@/lib/deskHistory";
 import { parseRange } from "@/lib/coverage";
 
@@ -13,7 +13,7 @@ import { parseRange } from "@/lib/coverage";
  * history exists for it.
  */
 export const GET = withGuard(async (request: Request) => {
-  const user = await requireUser();
+  const user = await requireStaff();
   const { searchParams } = new URL(request.url);
   const range = parseRange(
     searchParams.get("from") ?? undefined,

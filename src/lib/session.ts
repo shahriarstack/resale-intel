@@ -60,6 +60,34 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
+/**
+ * Require a member of STAFF — any desk, but not a portal member.
+ *
+ * The product deliberately lets every desk read every vehicle: what gets
+ * withheld from a role is the cost basis, not the record (see
+ * api/vehicles/[id], which says so). `requireUser` encodes that, and for the
+ * ten staff roles it is right.
+ *
+ * It is wrong for the eleventh. A PORTAL_VIEWER is an outsider on a named
+ * lens — a board observer, an auditor — and the Portal model promises they
+ * "sign in to exactly that and nothing else". The transition table already
+ * makes that true for actions: PORTAL_VIEWER appears in no row, so they can
+ * move nothing, by construction rather than by a check. It was never true for
+ * reads. A route that only called `requireUser` handed them the whole book.
+ *
+ * So the read side needs the check the write side gets for free. Use this
+ * anywhere a route returns a record rather than a portal's own composed view;
+ * `requireUser` remains correct for anything a portal member is meant to
+ * reach.
+ */
+export async function requireStaff(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (user.role === "PORTAL_VIEWER") {
+    throw new HttpError(403, "This account can only read its portal");
+  }
+  return user;
+}
+
 /** Require one of the given roles in an API route, or throw 401/403. */
 export async function requireRole(...roles: Role[]): Promise<SessionUser> {
   const user = await requireUser();
