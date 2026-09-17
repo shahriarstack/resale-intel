@@ -43,6 +43,7 @@ jobs:
           cp -r .next/standalone/.env* .deploy/ 2>/dev/null || true
           
           # Copy static files Next.js needs
+          mkdir -p .deploy/.next
           cp -r .next/static .deploy/.next/static
           cp -r public .deploy/public
           
