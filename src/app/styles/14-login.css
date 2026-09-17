@@ -1,0 +1,969 @@
+/* ===========================================================================
+   THE SIGN-IN SCREEN
+
+   Was a two-panel split: a dark brand panel on the left carrying the
+   headline over a vehicle photograph, and the form on white at the right.
+   It is now one centred column on a full-bleed ground, with the form as a
+   frosted card at the middle of it.
+
+   Every string from the split version is still on the page. The two halves
+   simply stack instead of sitting side by side, which is why the headline
+   comes down from 42px — centred over a 400px card it is a caption for the
+   thing below it rather than the left half of a spread.
+
+   THE GROUND IS DEEP, NOT PALE. It ran on `--accent-soft` (#dee3ff) for a
+   while, which is a tint meant for chips and plates: spread across a whole
+   viewport it has so little chroma that the screen reads as white with a
+   wash on it, and the aurora underneath had nothing to show against. It is
+   now the saturated end of the same blue-purple family, so the colour is the
+   screen rather than a tint over it.
+
+   Going deep inverts everything on top of it, and that is the bulk of this
+   file. The card is smoked glass instead of white, the type is light, and
+   the shared `.field` / `.label` / error styles — all of which resolve to
+   ink-on-white from 02-components — are re-toned inside `.login-stage`
+   rather than globally, because every other screen in the product still
+   wants the light versions.
+   ======================================================================== */
+
+@layer components {
+  .login-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    /* svh, so the address bar collapsing on a phone does not shift the card
+       mid-scroll. Declared second: browsers without it keep the vh above. */
+    min-height: 100svh;
+    padding: 32px 20px;
+    overflow: hidden;
+
+    /* Deep, and bright with it. The two radial stops are the "bright" half of
+       the brief: a violet lifted into the top-left corner and a true blue
+       pushed into the bottom-right, so the field has a light in it rather
+       than being one flat dark colour. The linear underneath carries the
+       floor down to near-navy at the bottom, which is what stops a saturated
+       purple screen from reading as a toy. */
+    background-color: #2b1b86;
+    background-image:
+      radial-gradient(115% 85% at 10% -8%, #6d4bf0 0%, transparent 56%),
+      radial-gradient(95% 75% at 102% 104%, #1e40af 0%, transparent 60%),
+      linear-gradient(158deg, #3b23ad 0%, #2b1b86 50%, #1c1360 100%);
+
+    /* Everything on this screen is now light-on-dark. Set once here so the
+       card, the lede and the footer inherit it rather than each naming a
+       white of its own. */
+    color: #fff;
+  }
+
+  /* ---- The moving ground ----
+     Three soft masses on the brand's own blue / purple / green, drifting
+     against each other on long, mismatched cycles so the composition never
+     repeats in a way the eye can catch.
+
+     Each is blurred once and then moved with `transform` alone. That
+     distinction is the whole performance story: a blur is expensive to
+     rasterise and cheap to composite, so animating position or size instead
+     of transform would re-run the blur every frame on the phone this is
+     signed into from a yard. */
+  .login-aurora {
+    position: absolute;
+    inset: -25%;
+    pointer-events: none;
+    /* Painted behind the card without needing a z-index on the card, and
+       clipped to the stage by its overflow. */
+    z-index: 0;
+  }
+
+  .login-aurora > span {
+    position: absolute;
+    display: block;
+    border-radius: 999px;
+    filter: blur(64px);
+    will-change: transform;
+  }
+
+  /* The three masses are lit versions of the brand hues, not the tokens
+     themselves. `--brand-purple` (#5a44c4) is a mid-tone chosen to sit on
+     white; on this ground it is darker than the floor it lands on and reads
+     as a smudge. Blurred bright colour on a deep field reads as light, which
+     is the whole reason the ground can be this saturated and still feel
+     open. */
+  .login-aurora > span:nth-child(1) {
+    width: 42vmax;
+    height: 42vmax;
+    left: -4%;
+    top: -6%;
+    opacity: 0.6;
+    background: radial-gradient(circle, #8b6cff, transparent 68%);
+    animation: loginDriftA 28s ease-in-out infinite alternate;
+  }
+  .login-aurora > span:nth-child(2) {
+    width: 38vmax;
+    height: 38vmax;
+    right: -8%;
+    top: 12%;
+    opacity: 0.5;
+    background: radial-gradient(circle, #3b82f6, transparent 68%);
+    animation: loginDriftB 34s ease-in-out infinite alternate;
+  }
+  /* The green stays the quietest of the three. It is in the wordmark's ramp
+     so it belongs here, but a green mass on a violet ground at any strength
+     starts describing a different product. */
+  .login-aurora > span:nth-child(3) {
+    width: 34vmax;
+    height: 34vmax;
+    left: 24%;
+    bottom: -14%;
+    opacity: 0.3;
+    background: radial-gradient(circle, #10b981, transparent 70%);
+    animation: loginDriftC 40s ease-in-out infinite alternate;
+  }
+
+  /* A fine lattice over the colour. Static — the drift is already the motion
+     on this screen, and a moving grid over moving colour is two things
+     competing. It is here to stop the large soft areas reading as a blurred
+     photograph. */
+  .login-weave {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    /* White now, not indigo. A dark lattice on a dark ground is nothing at
+       all — the dots have to be the light on this surface, as they are on
+       the ARO slab. */
+    background-image: radial-gradient(rgba(255, 255, 255, 0.13) 0.5px, transparent 0.5px);
+    background-size: 4px 4px;
+    -webkit-mask-image: radial-gradient(70% 60% at 50% 45%, #000 0%, transparent 78%);
+    mask-image: radial-gradient(70% 60% at 50% 45%, #000 0%, transparent 78%);
+  }
+
+  /* The layer that answers back. See components/login/LoginDots.tsx for what
+     it draws and why; everything here is position and compositing.
+
+     Over the lattice, under the card — the same z-plane as the other two
+     background layers, ordered by the DOM rather than by a z-index race.
+
+     `screen` so the points ADD to the ground rather than sitting on it. The
+     aurora underneath is a field of blurred light, and white dots painted
+     normally over it read as dust on a photograph; screened, a point over a
+     bright mass glows and the same point over the dark floor stays quiet,
+     which means the layer picks up the drift beneath it for free.
+
+     No `will-change`, no filter: the canvas repaints itself and promoting it
+     would only cost memory. */
+  .login-dots {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    /* NO MASK, deliberately.
+       The first version faded the layer out across the middle of the stage to
+       keep it off the form — which hid it over roughly the two thirds of the
+       screen where a pointer actually travels, so the one interactive thing
+       on the page could only be found in the corners. It is not needed
+       either: the card blurs its own backdrop at 34px, so points that pass
+       behind it arrive as a soft glow rather than as dots under type. */
+  }
+
+  /* ---- The spread ----
+     What the product is on the left, the way in on the right.
+
+     `1.05fr / 420px` rather than two equal halves: the right column is a form
+     with a fixed comfortable measure, and giving it a share of the width
+     instead of a width makes the card grow on a wide monitor, which a
+     two-field form should never do. The left takes whatever is left over.
+
+     Below 940px it becomes one centred column — a spread needs two columns
+     that can each hold a line of text, and under that the headline starts
+     breaking into ragged threes. */
+  .login-split {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 1080px;
+    display: grid;
+    grid-template-columns: 1.05fr 420px;
+    align-items: center;
+    gap: 64px;
+  }
+
+  .login-intro {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    min-width: 0;
+  }
+
+  .login-panel {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  @media (max-width: 940px) {
+    .login-split {
+      grid-template-columns: minmax(0, 404px);
+      justify-content: center;
+      gap: 0;
+    }
+    .login-intro {
+      align-items: center;
+      text-align: center;
+    }
+    .login-panel {
+      justify-content: center;
+    }
+    /* NOTE: the stacked layout's *typography* overrides are not here. They
+       live after the base type rules further down, because these blocks share
+       their specificity and the later declaration wins — put here, a
+       `font-size` would be silently overwritten by the base rule below. Only
+       layout, which has nothing competing with it, is set at this point. */
+  }
+
+  /* ---- The brand lockup ----
+     `align-items` follows the column it is in. It was pinned to `center` from
+     the centred layout, which in the spread left the badge and wordmark
+     floating 47px right of the headline underneath them — four different left
+     edges in one column, which is the single loudest thing that makes a
+     left-aligned layout look unconsidered. */
+  .login-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .login-brand-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+
+  /* The wordmark is an identifier, not the message. At 27px it was LARGER
+     than the headline below it, which inverts the hierarchy: the first thing
+     the eye sizes up should be what the product does, not what it is called.
+     The mark is still the first thing READ, because it is at the top. */
+  .login-wordmark {
+    font-size: 21px;
+  }
+
+  .login-brand-sub {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  /* One rule, trailing. A pair of them is a centred-layout device — the
+     leading rule pushed the ACI mark 32px off the column's left edge, so the
+     credit line started in a different place from everything above and below
+     it. Trailing alone reads as a measure running out, and the left edge
+     survives.
+
+     Longer now that it is the only thing beside the mark: at 22px, against a
+     lone logo rather than a run of text, it read as a stray dash. */
+  .login-brand-sub::after {
+    content: "";
+    width: 40px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.28), transparent);
+  }
+
+  /* ---- The lede ----
+     42px was right filling the left half of a spread. Centred over a 400px
+     card it would run to four ragged lines, so it comes down to 27 and the
+     paragraph under it to 13. The gradient on the two named words is
+     unchanged: it is what keeps the line reading as part of the mark. */
+  /* ---- Rhythm ----
+     The four blocks in this column were separated by 12 / 18 / 11 / 16px —
+     near enough identical that the column read as one undifferentiated
+     stack. Spacing is how a reader is told what belongs to what, so the gaps
+     are now deliberately uneven: a large one after the identity, a small one
+     binding the headline to its own paragraph, a large one before the
+     footnote that belongs to neither. */
+  .login-lede {
+    margin-top: 42px;
+  }
+
+  /* The headline is the message and now reads like it. 40px against a 21px
+     wordmark is a real step, and at that size the tracking has to come in —
+     display type set at body tracking looks slack. */
+  .login-lede h1 {
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: -0.034em;
+    color: #fff;
+  }
+  /* The measure is capped either way; only the alignment changes. In the
+     spread the paragraph hangs off the same left edge as the headline, so the
+     auto margins have to go — with them it centred inside the column and sat
+     82px in from the headline above it, which reads as an accident. Below
+     940px the column is centred and they come back. */
+  .login-lede p {
+    margin: 16px 0 0;
+    /* A measure in characters rather than a magic 370px. ~46ch is the band
+       where a line stays comfortable to read; pinning it in px meant the
+       relationship to the type size was accidental and broke every time the
+       size moved at a breakpoint. */
+    max-width: 46ch;
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+    /* The headline already balances its lines; this does the equivalent for
+       the paragraph — it stops the last line falling to a single orphaned
+       word, which is the one rag fault a reader notices. Ignored by browsers
+       that do not have it, so it costs nothing. */
+    text-wrap: pretty;
+  }
+  @media (max-width: 940px) {
+    .login-lede p {
+      margin-left: auto;
+      margin-right: auto;
+    }
+  }
+
+  /* ---- The two gradient marks, relit ----
+     `.brand-grad` and `.login-headline-mark` both paint text with the
+     blue → purple → green ramp built for a white page. Clipped to text on
+     this ground, `--brand-purple` at #5a44c4 is darker than the floor behind
+     it, so the middle of both marks drops out and the wordmark reads as two
+     coloured ends with a hole between them.
+
+     Same three hues, lifted to their tint versions, which is the ordinary
+     fix for a brand ramp crossing onto a dark surface. */
+  .login-stage .brand-grad,
+  .login-stage .login-headline-mark,
+  .login-stage .app-foot-who {
+    background-image: linear-gradient(
+      100deg,
+      #93c5fd 0%,
+      #c4b5fd 48%,
+      #6ee7b7 100%
+    );
+    color: #c4b5fd;
+  }
+
+  /* ---- The sweep ----
+     A band of light crossing the two branded words, once every eight seconds.
+
+     It is layered INTO the same `background-clip: text` the mark already uses
+     — a second gradient above the brand ramp, moved by background-position —
+     so the light is inside the letterforms rather than a shape passing over
+     them. An overlay would have to sit on top of the type and would catch the
+     ground between the glyphs; this cannot.
+
+     The timing is the whole design. The sweep occupies about a fifth of the
+     cycle and the mark is still for the rest: a shimmer that runs continuously
+     reads as a casino, and one that runs once is missed by anyone who arrives
+     a second late. A long rest with a brief pass reads as a polished surface
+     catching the light when the page moves. */
+  .login-stage .login-headline-mark {
+    background-image:
+      linear-gradient(
+        100deg,
+        transparent 34%,
+        rgba(255, 255, 255, 0.9) 47%,
+        transparent 60%
+      ),
+      linear-gradient(100deg, #93c5fd 0%, #c4b5fd 48%, #6ee7b7 100%);
+    background-size: 240% 100%, 100% 100%;
+    background-position: 165% 0, 0 0;
+    background-repeat: no-repeat;
+    animation: login-sheen 8s var(--ease-standard) 1.1s infinite;
+  }
+  @keyframes login-sheen {
+    0%,
+    64% {
+      background-position: 165% 0, 0 0;
+    }
+    93%,
+    100% {
+      background-position: -75% 0, 0 0;
+    }
+  }
+
+  /* ---- The card ----
+     Smoked glass. A white pane on this ground would be the brightest thing on
+     the screen by a wide margin, which puts the visual weight on a container
+     rather than on the two fields inside it — and it would reinstate exactly
+     the white rectangle this pass exists to remove.
+
+     So the card is a dark tint of the ground with the light caught on its top
+     edge: the same material logic as the ARO slab. It reads as a pane lying
+     ON the colour rather than a hole cut out of it. */
+  .login-card {
+    margin-top: 0;
+    width: 100%;
+    max-width: 420px;
+    padding: 30px 28px 26px;
+    border-radius: 26px;
+    text-align: left;
+
+    /* Actual glass: a WHITE film at low alpha, not a dark tint. The
+       difference matters and it is the whole look — a dark translucent pane
+       reads as a shadow on the ground, where a white film at 8% reads as a
+       sheet of frosted glass lying on it, because that is what glass does to
+       the colour behind it. The saturate() then keeps the violet coming
+       through the frost vivid instead of going milky.
+
+       The blur is what makes the transparency legible: without it the aurora
+       drifts visibly behind the password field, which is distracting exactly
+       where concentration is needed. */
+    background: rgba(255, 255, 255, 0.08);
+    -webkit-backdrop-filter: blur(34px) saturate(180%);
+    backdrop-filter: blur(34px) saturate(180%);
+
+    /* Light caught along the top edge and around the rim, falling into a deep
+       shadow underneath — the pane has to look like it is floating above the
+       ground, or the transparency reads as a hole. */
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.34),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+      0 34px 80px -36px rgba(4, 2, 26, 0.8),
+      0 10px 26px -14px rgba(4, 2, 26, 0.5);
+  }
+
+  /* Without backdrop-filter there is no frost, and an 8% white film over a
+     drifting aurora is unreadable. Those browsers get a solid pane instead —
+     the layout is identical and only the material is lost. */
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .login-card {
+      background: rgba(28, 19, 88, 0.94);
+    }
+  }
+
+  /* ---- Re-toning the shared form styles ----
+     `.field`, `.label` and the error box all resolve to ink-on-white in
+     02-components, and every other screen still wants that. Scoped to the
+     card so nothing else moves.
+
+     The inputs are darker than the pane they sit in, not lighter. On a light
+     card a field is recessed by being a shade grey; the same instinct on a
+     dark card means going down, not up — a white input here would be two
+     bright rectangles competing with the button for the eye. */
+  .login-card h2 {
+    color: #fff;
+  }
+  .login-card .label {
+    color: rgba(255, 255, 255, 0.62);
+  }
+  .login-card .field {
+    background: rgba(9, 6, 38, 0.46);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: #fff;
+  }
+  .login-card .field::placeholder {
+    color: rgba(255, 255, 255, 0.34);
+  }
+  .login-card .field:hover:not(:focus):not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.24);
+  }
+  .login-card .field:focus {
+    border-color: rgba(167, 139, 250, 0.85);
+    background: rgba(9, 6, 38, 0.6);
+    box-shadow: 0 0 0 3px rgba(139, 108, 255, 0.28);
+  }
+  /* Chrome paints its own near-white block over an autofilled field, which
+     would undo all of the above the moment a password manager fires. A long
+     inset shadow is the only way to repaint it. */
+  .login-card .field:-webkit-autofill,
+  .login-card .field:-webkit-autofill:hover,
+  .login-card .field:-webkit-autofill:focus {
+    -webkit-text-fill-color: #fff;
+    -webkit-box-shadow: 0 0 0 1000px #1b1252 inset;
+    caret-color: #fff;
+  }
+
+  /* The failure message. `bg-bad-soft` is a pale pink built for a white page
+     and it glares here; the reading is carried by a light red on a dark
+     translucent ground instead. */
+  .login-card [class*="bg-bad-soft"] {
+    background: rgba(196, 40, 71, 0.2) !important;
+    border-color: rgba(255, 138, 158, 0.4) !important;
+    color: #ffd2da !important;
+  }
+
+  /* Every paragraph in the card. `!important` throughout this block is not
+     laziness: the markup sets `text-ink-2` / `text-ink-3`, which are Tailwind
+     utilities, and utilities sit in a later cascade layer than components —
+     so a component-layer rule cannot win on specificity alone. The
+     alternative is editing the colour out of the JSX, which would leave the
+     markup unable to render on a light ground if this screen is ever
+     reverted. */
+  .login-card p {
+    color: rgba(255, 255, 255, 0.66) !important;
+  }
+  /* The two sign-off lines under the form, quieter than the rest. */
+  .login-card > p {
+    color: rgba(255, 255, 255, 0.42) !important;
+  }
+
+  /* ---- The signature ----
+     Minimal on purpose: the same 8.5px mono line the app footer uses, so the
+     one place the maker is named looks identical wherever it appears. Smaller
+     and quieter than the support line above it, because it is the least
+     urgent thing on the screen and should be found rather than read. */
+  /* Selector carries `.login-card >` so it outranks the blanket
+     `.login-card > p` colour above — both are !important, so specificity is
+     what decides, and without it the signature sat at the same 0.42 as the
+     support line it is meant to sit below. */
+  .login-card > p.login-sign {
+    margin-top: 14px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.34) !important;
+    transition: color 0.3s var(--ease-standard);
+  }
+  .login-card > p.login-sign:hover {
+    color: rgba(255, 255, 255, 0.62) !important;
+  }
+
+  /* ---- The action ----
+     White, not the house indigo. `--accent` is #4a3fc7 and the card it sits
+     on is a tint of the same violet: the button had the right colour and
+     almost none of the contrast, so the one thing on the screen you are
+     meant to press read as the flattest element on it.
+
+     Inverting it is the ordinary move for a saturated ground, and it puts the
+     brightest value on the page exactly where the eye should finish. */
+  .login-card .btn-primary {
+    background-color: #fff;
+    background-image: linear-gradient(180deg, #fff 0%, #eceaff 100%);
+    color: #241a6b;
+    border-color: transparent;
+    font-weight: 700;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 10px 24px -12px rgba(4, 2, 24, 0.7),
+      0 2px 6px -2px rgba(4, 2, 24, 0.4);
+  }
+  .login-card .btn-primary:hover:not(:disabled) {
+    background-color: #fff;
+    background-image: none;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 12px 28px -12px rgba(4, 2, 24, 0.8);
+  }
+  .login-card .btn-primary:active:not(:disabled) {
+    background-color: #e4e1ff;
+    background-image: none;
+    box-shadow: none;
+  }
+  .login-card .btn-primary:disabled {
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #2f2580;
+  }
+
+  /* ---- The parent mark ----
+     `aci-motors.png` is the colour lockup, drawn for a white page. Rendered
+     white here: on a ground this saturated the colour version loses its
+     darker strokes entirely, and a half-legible parent mark is worse than a
+     mono one. If ACI's guidelines require the colour lockup on dark, the fix
+     is a supplied reversed asset, not this filter. */
+  .login-brand-sub img {
+    filter: brightness(0) invert(1);
+    opacity: 0.75;
+  }
+
+  /* A footnote, not the last line of the paragraph. The large gap is what
+     says so. */
+  .login-foot {
+    margin-top: 40px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .login-foot .login-foot-rule {
+    width: 22px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+  }
+
+  /* ---- Stacked: the typographic half ----
+     Declared here, after the base type rules, for the reason noted up at the
+     layout block: same specificity, so position decides. */
+  @media (max-width: 940px) {
+    /* The column is centred, so the lockup centres with it and the credit
+       line gets its pair of rules back — a leading rule only misaligns
+       something when there is a left edge to misalign it against. */
+    .login-brand {
+      align-items: center;
+    }
+    /* Mirrors the trailing rule exactly — same length, same fade running the
+       other way. A centred pair that does not match reads as a mistake, and
+       the trailing one grew to 40px with a gradient when the credit text was
+       removed. */
+    .login-brand-sub::before {
+      content: "";
+      width: 40px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28));
+    }
+    /* No spread to fill, and 40px over a 375px phone runs the headline to
+       four lines. The step over the wordmark is kept, just a smaller one.
+
+       Three things move with the size and none of them IS the size:
+
+       tracking tightens further, because a display face on a 375px screen has
+       proportionally more air in it than the same face on a desktop — the
+       line has to hold together as a shape;
+
+       the leading closes, so three stacked lines read as one block rather
+       than three sentences;
+
+       and a hair of shadow goes underneath. Not a glow — 0 1px 16px at 22%
+       black, invisible as an effect, doing exactly one thing: stopping white
+       type vibrating against a saturated violet ground, which is the artefact
+       that makes a headline on colour look cheap. */
+    .login-lede h1 {
+      font-size: 30px;
+      letter-spacing: -0.036em;
+      line-height: 1.06;
+      text-shadow: 0 1px 16px rgba(10, 6, 40, 0.22);
+    }
+    /* The sentence gains contrast as it loses size. 70% of white at 13px on
+       this ground is a whisper; it needs the lift to stay a sentence somebody
+       actually reads. */
+    .login-lede p {
+      margin-top: 13px;
+      font-size: 12.5px;
+      line-height: 1.62;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    .login-lede {
+      margin-top: 30px;
+    }
+    .login-foot {
+      margin-top: 30px;
+    }
+  }
+
+  /* Short viewports. A laptop at 1280×720 leaves roughly 620px of page once
+     the browser's own chrome is out, and the column has to fit in it without
+     scrolling — a sign-in screen you have to scroll to reach the button is a
+     sign-in screen that looks broken.
+
+     The stage's own padding goes first, because 28px of it buys more than any
+     type change and costs nothing anyone can see. */
+  @media (max-height: 800px) {
+    .login-stage {
+      padding: 18px 20px;
+    }
+    /* The gaps compress before the type does — 24px of whitespace buys more
+       room than a type step and costs the hierarchy nothing.
+
+       These three are width-agnostic: a short screen wants less padding and
+       tighter gaps whatever its width. The HEADLINE is not, and it moved out
+       — see the block immediately below. */
+    .login-lede {
+      margin-top: 30px;
+    }
+    .login-card {
+      padding: 24px 22px 20px;
+    }
+    .login-foot {
+      margin-top: 28px;
+    }
+  }
+
+  /* ---- Short, and WIDE ----
+     34px is a step DOWN from the 40px base, and it only reads as one where
+     that base applies. Written as a bare `max-height: 800px` it also caught
+     every phone taller than 680 and shorter than 800 — where the width block
+     above had already brought the headline to 30px — and, coming later in the
+     source at equal specificity, put it back up to 34. A 375x700 phone got
+     LARGER type than a 375x812 one, which is backwards: the screen with less
+     room was being given more to fit.
+
+     `min-width: 941px` is the fix and it is the honest reading of the rule.
+     This was always a small-laptop adjustment; it just never said so. Narrow
+     screens now fall to the width block's 30px, and the 680px block below
+     takes both widths down to 28px when the screen is genuinely tiny. */
+  @media (min-width: 941px) and (max-height: 800px) {
+    .login-lede h1 {
+      font-size: 34px;
+    }
+  }
+
+  /* The gap between the intro and the card belongs to the STACKED layout
+     only. In the spread the card is a grid column centred against the intro,
+     and a top margin there would push it below the line it is meant to sit
+     on. Both of these are width-scoped for that reason. */
+  @media (max-width: 940px) {
+    .login-panel {
+      margin-top: 26px;
+    }
+  }
+  @media (max-width: 940px) and (max-height: 800px) {
+    .login-panel {
+      margin-top: 18px;
+    }
+  }
+
+  /* Shorter still — a small laptop, or a phone in landscape. */
+  @media (max-height: 680px) {
+    .login-lede {
+      margin-top: 22px;
+    }
+    .login-lede h1 {
+      font-size: 28px;
+    }
+    .login-lede p {
+      margin-top: 11px;
+      font-size: 12px;
+    }
+    .login-wordmark {
+      font-size: 19px;
+    }
+    .login-foot {
+      margin-top: 20px;
+    }
+  }
+  @media (max-width: 940px) and (max-height: 680px) {
+    .login-panel {
+      margin-top: 14px;
+    }
+  }
+}
+
+/* ---- Keyframes ----
+   Long, uneven and on `alternate`, so the three masses never return to the
+   same arrangement at the same time. Nothing travels far: this is a ground
+   that is not quite still, not a screensaver. */
+@keyframes loginDriftA {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(7%, 5%, 0) scale(1.12);
+  }
+}
+@keyframes loginDriftB {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.06);
+  }
+  to {
+    transform: translate3d(-8%, 7%, 0) scale(0.94);
+  }
+}
+@keyframes loginDriftC {
+  from {
+    transform: translate3d(0, 0, 0) scale(0.96);
+  }
+  to {
+    transform: translate3d(6%, -6%, 0) scale(1.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-aurora > span {
+    animation: none !important;
+  }
+}
+
+/* ==========================================================================
+   THE ENTRANCE
+   ========================================================================== */
+
+@layer components {
+  /* Shorter travel than the shared `slideUp`. On a sign-in page there is
+     nothing above these lines for them to have come from, so a long rise reads
+     as movement for its own sake; 12px is enough to register as arrival and
+     little enough to feel like settling rather than sliding. */
+  @keyframes loginRise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+
+  /* Everything optional stops. The sweep is decoration and goes entirely; the
+     entrance keeps its fade so nothing pops, but loses the travel. */
+  @media (prefers-reduced-motion: reduce) {
+    .login-stage .login-headline-mark {
+      animation: none;
+      background-position: -75% 0, 0 0;
+    }
+    @keyframes loginRise {
+      from {
+        opacity: 0;
+        transform: none;
+      }
+    }
+  }
+
+  /* ---- Role, and where it takes you ------------------------------------
+     Sign-in is a ROLE and a passcode. The select is the first field on the
+     page, so it is given the weight of one: the same field chrome as the
+     passcode below it, plus a caret of our own, because the platform arrow is
+     the one part of a native select that never matches anything around it.
+
+     A chosen role is tinted. Until then the control reads as an empty field
+     rather than as a setting already made — the difference between "choose"
+     and "confirm", on the one screen where nobody should be confirming a
+     default.
+
+     THESE COLOURS ARE LIGHT-ON-DARK, and they have to be named here.
+     `--ink` and `--ink-3` are the ink ramp for a white page, and this card is
+     smoked glass over a deep violet: the placeholder resolved to a mid grey
+     with barely any contrast against it, and the CHOSEN role resolved to
+     #0e1116 — near-black type on a near-black field, which meant picking your
+     role made it disappear. Both rules also outranked the `.login-card
+     .field` re-toning above by a class, so nothing further up the file could
+     save them.
+
+     `color-scheme: dark` is the other half. Without it Chrome paints the
+     control's internals — and the dropdown it opens — from the light theme,
+     so the list of roles arrives as pale text on a pale sheet regardless of
+     what the closed field looks like. */
+  /* THE CARET IS DECLARED AS ONE SHORTHAND, IN EVERY STATE, AND THAT IS NOT A
+     STYLE PREFERENCE — IT IS THE BUG FIX.
+
+     It was written as longhands: `background-image` here, with
+     `background-size`, `-position` and `-repeat` beside it. Three rules then
+     collided. `.login-card .field:focus` re-tones the field with the
+     `background` SHORTHAND, which resets every background longhand it does not
+     name — size to `auto`, repeat to `repeat` — and it outranks this rule by a
+     class. The hover/focus rule below then re-supplied the image ALONE, being
+     later and equal in weight.
+
+     So on a focused or hovered select the two 5px arrow-halves painted at the
+     size of the whole control and tiled: a white field with a giant navy
+     wedge through it, which is what the sign-in screen was showing. A caret is
+     an image PLUS a geometry, and splitting them across declarations let one
+     survive a reset the other did not.
+
+     One shorthand per state carries both, and nothing can half-reset it. */
+  .login-stage .login-role {
+    appearance: none;
+    -webkit-appearance: none;
+    color-scheme: dark;
+    padding-right: 38px;
+    background:
+      linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.68) 50%)
+        calc(100% - 19px) 51% / 5px 5px no-repeat,
+      linear-gradient(135deg, rgba(255, 255, 255, 0.68) 50%, transparent 50%)
+        calc(100% - 14px) 51% / 5px 5px no-repeat,
+      rgba(9, 6, 38, 0.46);
+    cursor: pointer;
+  }
+  .login-stage .login-role[data-chosen] {
+    font-weight: 600;
+    color: #fff;
+  }
+  /* The placeholder option only. Greying the whole control would grey the
+     chosen role with it. Still quieter than a chosen role, but at 0.58 it is
+     legible rather than hinted at — it is an instruction, and an instruction
+     nobody can read is the field failing at the only job it has before it is
+     answered. */
+  .login-stage .login-role:not([data-chosen]) {
+    color: rgba(255, 255, 255, 0.58);
+  }
+  /* Lit on hover and on focus, so the control says it opens. Same shorthand,
+     for the reason above — the field's own focus rule would otherwise strip
+     the geometry out from under it. */
+  .login-stage .login-role:hover:not(:disabled) {
+    background:
+      linear-gradient(45deg, transparent 50%, #fff 50%)
+        calc(100% - 19px) 51% / 5px 5px no-repeat,
+      linear-gradient(135deg, #fff 50%, transparent 50%)
+        calc(100% - 14px) 51% / 5px 5px no-repeat,
+      rgba(9, 6, 38, 0.52);
+  }
+  .login-stage .login-role:focus {
+    background:
+      linear-gradient(45deg, transparent 50%, #fff 50%)
+        calc(100% - 19px) 51% / 5px 5px no-repeat,
+      linear-gradient(135deg, #fff 50%, transparent 50%)
+        calc(100% - 14px) 51% / 5px 5px no-repeat,
+      rgba(9, 6, 38, 0.6);
+  }
+
+  /* THE OPEN DROPDOWN IS NOT THIS CARD.
+     It is an OS-drawn sheet that inherits the select's own colours, so the
+     eleven role names were being painted in the closed field's near-invisible
+     ink on a sheet of the browser's choosing. The list is given its own
+     surface — the same deep indigo as the card, with white type — so it reads
+     as part of this screen instead of borrowing from it.
+
+     Group labels stay dimmer and smaller: "In the field" and "Head office"
+     are the structure of the list, not entries in it. */
+  .login-stage .login-role option {
+    color: #fff;
+    background-color: #1b1252;
+    font-weight: 500;
+  }
+  .login-stage .login-role option[value=""] {
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .login-stage .login-role optgroup {
+    color: rgba(255, 255, 255, 0.5);
+    background-color: #140d3f;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* The answer back. Slides in under the select the moment a role is picked
+     and is keyed on the role, so changing the choice replays it — the card is
+     confirming THIS role, not sitting there having confirmed one once. */
+  .login-role-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    animation: loginRoleIn 0.28s var(--ease-out-quart) both;
+  }
+  .login-role-glyph {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    color: var(--on-accent);
+    background: var(--accent);
+  }
+  .login-role-name {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--accent-ink);
+  }
+  .login-role-sub {
+    margin-top: 1px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--accent-ink-on-soft);
+  }
+  @keyframes loginRoleIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .login-role-card {
+      animation-name: none;
+    }
+  }
+}

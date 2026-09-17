@@ -1,0 +1,329 @@
+/* ===========================================================================
+   DIRECT-CAPTURE WINDOWS — the admin console at /admin/capture-windows
+
+   The one screen that can suspend the approval gate, so its job is to make an
+   open window feel like a live thing rather than a saved setting. Three states
+   get three treatments, and the differences are deliberate:
+
+     shut     jade, flat, no shadow. The default and the good state — it should
+              look settled, not like an empty slot waiting to be filled.
+     open     ochre, a lit plate, a usage bar. The only surface on this page
+              carrying a fill, because it is the only one describing something
+              currently happening.
+     closed   ink on paper, no tint at all. A ledger row. It is evidence, not a
+              control, and evidence does not need colour.
+
+   The ochre is --warn throughout and never --bad: an open window is not an
+   error, it is an authorised exception, and painting it red would teach admins
+   to dismiss the colour that means something has actually gone wrong.
+   ======================================================================== */
+
+@layer components {
+  /* ---- Shut: the resting state ---- */
+  .cw-shut {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 16px 18px;
+    border-radius: var(--radius-lg);
+    background: var(--ok-soft);
+    box-shadow: inset 0 0 0 1px var(--ok-line);
+  }
+  .cw-shut-plate {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    color: var(--ok-ink);
+    background: color-mix(in srgb, var(--ok) 16%, transparent);
+  }
+  .cw-shut-title {
+    font-family: var(--font-display);
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--ok-ink);
+  }
+  .cw-shut-note {
+    margin-top: 3px;
+    max-width: 62ch;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ok-ink);
+  }
+
+  /* ---- Open: a live authorisation ---- */
+  .cw-live {
+    border-radius: var(--radius-lg);
+    background: var(--grad-tint-warn);
+    box-shadow: inset 0 0 0 1px var(--warn-line);
+    overflow: hidden;
+  }
+  .cw-live-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 15px 16px 13px;
+  }
+  .cw-live-plate {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    color: var(--warn-ink);
+    background: color-mix(in srgb, var(--warn) 18%, transparent);
+  }
+  .cw-clock,
+  .cw-scope {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .cw-clock {
+    color: var(--warn-ink);
+    background: color-mix(in srgb, var(--warn) 15%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 26%, transparent);
+  }
+  .cw-scope {
+    color: var(--ink-2);
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    font-weight: 500;
+  }
+
+  /* The admin's own sentence, and the most-read thing on the card — it is what
+     any later question about these vehicles gets answered with. */
+  .cw-reason {
+    margin-top: 7px;
+    max-width: 62ch;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+  .cw-meta {
+    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--warn-ink);
+  }
+
+  /* The usage strip sits on its own ground so the figures read as a readout
+     rather than as more of the card's prose. */
+  .cw-usage {
+    padding: 10px 16px 12px;
+    background: color-mix(in srgb, var(--surface) 62%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--warn) 22%, transparent);
+  }
+  .cw-usage-figures {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+  .cw-usage-n {
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .cw-usage-l {
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .cw-usage-left {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--warn-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .cw-usage-uncapped {
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .cw-bar {
+    position: relative;
+    margin-top: 8px;
+    height: 4px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--warn) 16%, transparent);
+    overflow: hidden;
+  }
+  .cw-bar-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 999px;
+    background: var(--warn);
+    transition: width 0.4s var(--ease-out-quart);
+  }
+
+  /* ---- The trigger ---- */
+  .cw-open-trigger {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 15px;
+    text-align: left;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    transition:
+      box-shadow 0.2s var(--ease-standard),
+      translate 0.2s var(--ease-out-quart);
+  }
+  .cw-open-trigger:hover {
+    translate: 0 -1px;
+    box-shadow:
+      inset 0 0 0 1px var(--warn-line),
+      0 6px 18px -12px color-mix(in srgb, var(--warn) 55%, transparent);
+  }
+  .cw-open-plate {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    color: var(--warn-ink);
+    background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 20%, transparent);
+  }
+  .cw-open-title {
+    display: block;
+    font-size: 14.5px;
+    font-weight: 650;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+  }
+  .cw-open-note {
+    display: block;
+    margin-top: 1px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+
+  /* ---- The form ---- */
+  .cw-form {
+    padding: 16px 18px 14px;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--warn-line);
+    animation: slideDown 0.2s var(--ease-standard);
+  }
+  .cw-form-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .cw-form-title {
+    font-family: var(--font-display);
+    font-size: 16.5px;
+    font-weight: 700;
+    letter-spacing: -0.018em;
+    color: var(--ink);
+  }
+  .cw-form-sub {
+    margin-top: 2px;
+    max-width: 58ch;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  /* The unit rides inside the field so "7 days" reads as one value, rather
+     than a number box next to a stray word. */
+  .cw-days {
+    position: relative;
+  }
+  .cw-days .field {
+    padding-right: 46px;
+  }
+  .cw-days-unit {
+    position: absolute;
+    top: 50%;
+    right: 11px;
+    translate: 0 -50%;
+    pointer-events: none;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+  .cw-form-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 13px;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* ---- The ledger ---- */
+  .cw-past {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 15px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+  .cw-past-reason {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  .cw-past-note {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  /* The count is the point of a closed window — how many records it let in. */
+  .cw-past-count {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 5px;
+    border-radius: 999px;
+    padding: 3px 10px;
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cw-open-trigger,
+    .cw-bar-fill {
+      transition: none;
+    }
+    .cw-open-trigger:hover {
+      translate: none;
+    }
+    .cw-form {
+      animation: none;
+    }
+  }
+}

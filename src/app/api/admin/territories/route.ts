@@ -13,7 +13,11 @@ export const POST = withGuard(async (request: Request) => {
   await requireRole("SUPER_ADMIN");
   const data = territorySchema.parse(await request.json());
   const row = await prisma.territory.create({
-    data: { name: data.name, code: data.code?.trim() || null },
+    data: {
+      name: data.name,
+      code: data.code?.trim() || null,
+      part: data.part || null,
+    },
   });
   return ok(row, 201);
 });

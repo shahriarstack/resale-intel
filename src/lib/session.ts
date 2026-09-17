@@ -7,7 +7,24 @@ export interface SessionUser {
   name: string;
   role: Role;
   staffId: string;
-  territoryId: string | null;
+  /**
+   * Every territory this person works — their base posting and any they cover.
+   *
+   * A list rather than the single `territoryId` it replaced, because an
+   * officer holding a vacant neighbouring patch works both, and anything that
+   * scopes by "their territory" has to mean all of them. Empty for the desks,
+   * which are not posted anywhere.
+   */
+  territoryIds: string[];
+  /**
+   * The one they are BASED in, of those.
+   *
+   * Carried separately rather than taken as the first of the list, because
+   * "which of these is home" is a fact and array order is not. It is what a
+   * form falls back to when it needs one territory and the officer holds
+   * several — a cover is where they are helping out, not where they belong.
+   */
+  baseTerritoryId: string | null;
 }
 
 /** The current user, or null. Use in pages/layouts that handle redirects. */
@@ -20,7 +37,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     name: u.name ?? "",
     role: u.role,
     staffId: u.staffId,
-    territoryId: u.territoryId ?? null,
+    territoryIds: u.territoryIds ?? [],
+    baseTerritoryId: u.baseTerritoryId ?? null,
   };
 }
 

@@ -32,14 +32,14 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
+#
+# BOTH PATTERNS, and the second one is not redundant. `.env*` only matches
+# names that START with ".env" — it does not match `server.env`, which held the
+# production database password and session secret and was sitting untracked and
+# committable. The remote is public GitHub; one `git add .` would have published
+# them.
 .env*
 *.env
-server.env
-update_env.ps1
-
-# IDE / agent files
-.claude/
-.claude-launch-note.txt
 
 # vercel
 .vercel

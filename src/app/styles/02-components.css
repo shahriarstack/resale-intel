@@ -1,0 +1,1521 @@
+@layer components {
+  /* ---- Typographic helpers ---- */
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .page-title {
+    font-family: var(--font-display);
+    font-size: var(--t-2xl);
+    font-weight: 700;
+    line-height: 1.04;
+    letter-spacing: var(--track-display);
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+
+  /* ---- Surfaces ---- */
+  /* A card sits ON the page. It is not floating, so it casts nothing.
+     Every card in the product carried a shadow, which is why the page read
+     as a pile of hovering rectangles rather than a composed sheet. Structure
+     is the hairline; elevation is reserved for things that genuinely leave
+     the page. */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    transition: border-color 0.18s var(--ease-standard);
+  }
+
+  .card-hover:hover {
+    border-color: var(--rule-strong);
+  }
+
+  .card-lg {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+  }
+
+  /* The exception: something deliberately raised off the sheet. */
+  .card-elevated {
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+
+
+  /* ---- Metric tile ----
+     A dense KPI/stat card: single line for label+icon, tight numeric block
+     below. Restraint over drama: the accent bar and border shift on hover, but
+     nothing translates or scales. */
+  .metric {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 14px 14px 12px;
+    box-shadow: var(--shadow-xs);
+    transition:
+      border-color 0.2s var(--ease-standard),
+      background 0.2s var(--ease-standard);
+  }
+  .metric::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: var(--metric-accent, var(--rule-strong));
+    transform: scaleX(0);
+    transform-origin: left center;
+    opacity: 0;
+    transition:
+      transform 0.35s var(--ease-out-quart),
+      opacity 0.2s var(--ease-standard);
+  }
+  .metric:hover {
+    border-color: var(--rule-strong);
+  }
+  .metric:hover::before,
+  .metric[data-on="true"]::before {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  .metric[data-interactive="true"] {
+    cursor: pointer;
+  }
+  .metric[data-interactive="true"]:hover {
+    background: var(--surface-2);
+  }
+  .metric[data-on="true"] {
+    border-color: var(--metric-accent, var(--accent));
+  }
+  .metric-value {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .metric-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .metric-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--ink-3);
+    margin-top: 4px;
+  }
+  .metric-glyph {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--metric-soft, var(--surface-3));
+    color: var(--metric-accent, var(--ink-3));
+  }
+
+  /* ---- Buttons ----
+     Aura buttons: soft, decisive, with a whisper of inner light on filled
+     variants (top-highlight gradient) and a barely-there ambient shadow.
+     Pressing scales down 0.5% and dulls the highlight briefly. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13.5px;
+    line-height: 1;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    transition:
+      background-color 0.18s var(--ease-standard),
+      border-color 0.18s var(--ease-standard),
+      box-shadow 0.18s var(--ease-standard),
+      transform 0.12s var(--ease-standard);
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: -0.005em;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+
+  /* Primary — accent fill with a subtle top-highlight and 1px inner border
+     for that "lit from above" Aura feel. */
+  /* One flat accent fill. It used to be a gradient with a coloured glow
+     under it, which made the single most-used control in the product the
+     most decorated thing on the page. */
+  .btn-primary {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-2);
+  }
+
+  /* Ghost — restrained; hairline border on surface, softens to surface-2 on hover. */
+  .btn-ghost {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--rule);
+    box-shadow: var(--shadow-xs);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--surface-2);
+    border-color: var(--rule-strong);
+  }
+
+  /* Danger — soft red pill, gains presence on hover but never shouts. */
+  .btn-danger {
+    background: var(--bad-soft);
+    color: var(--bad-ink);
+    border-color: color-mix(in srgb, var(--bad) 22%, transparent);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bad) 14%, var(--surface));
+    border-color: color-mix(in srgb, var(--bad) 34%, transparent);
+  }
+
+  /* Ok — success-tone fill, same lit-from-above treatment as primary. */
+  .btn-ok {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 40%),
+      var(--ok);
+    color: #fff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 1px 2px rgba(0, 82, 55, 0.26);
+  }
+  .btn-ok:hover:not(:disabled) {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 40%),
+      color-mix(in srgb, var(--ok) 90%, #000);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 2px 6px rgba(27, 94, 66, 0.26);
+  }
+  .btn-sm {
+    padding: 6px 11px;
+    font-size: 12.5px;
+    border-radius: 8px;
+  }
+  .btn-block {
+    width: 100%;
+  }
+  .btn-icon {
+    padding: 8px;
+    gap: 0;
+  }
+
+  /* ---- Inputs ----
+     Softer than before: uses the near-white surface-2 as the resting state
+     so the field reads as a "well" that the caret drops into, then whitens
+     on focus to signal the active edit surface. The border is a hairline —
+     the focus ring does the announcing. */
+  .field {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 14px;
+    color: var(--ink);
+    transition:
+      border-color 0.18s var(--ease-standard),
+      box-shadow 0.18s var(--ease-standard),
+      background-color 0.15s var(--ease-standard);
+    outline: none;
+  }
+  .field::placeholder {
+    color: var(--ink-3);
+  }
+  .field:hover:not(:focus):not(:disabled) {
+    border-color: var(--rule-strong);
+  }
+  .field:focus {
+    background: var(--surface);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  .field:disabled {
+    background: var(--surface-2);
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  select.field {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238994a1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    cursor: pointer;
+  }
+  .label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 6px;
+  }
+
+  /* ---- Chips / badges ----
+     Aura chips are borderless soft-tone pills. The colour alone carries the
+     meaning; the removed border avoids adding visual weight next to compact
+     text. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 3px 9px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    white-space: nowrap;
+    transition: background-color 0.15s var(--ease-standard);
+  }
+  .chip-neutral {
+    background: var(--surface-3);
+    color: var(--ink-2);
+  }
+  .chip-accent {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+  .chip-ok {
+    background: var(--ok-soft);
+    color: var(--ok-ink);
+  }
+  .chip-warn {
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+  }
+  .chip-bad {
+    background: var(--bad-soft);
+    color: var(--bad-ink);
+  }
+
+  /* ---- Data table ----
+     Quiet, editorial density: hairline row rules, softer header, gentle row
+     highlight on hover. The first-cell "strong" style promotes the primary
+     identity column without needing a heavier font. */
+  .dtable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  .dtable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: left;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+    user-select: none;
+  }
+  .dtable thead th.sortable {
+    cursor: pointer;
+    transition: color 0.15s var(--ease-standard);
+  }
+  .dtable thead th.sortable:hover {
+    color: var(--ink);
+  }
+  .dtable tbody td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: middle;
+    transition: background-color 0.12s var(--ease-standard);
+  }
+  .dtable tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .dtable tbody tr:hover td {
+    background: var(--surface-2);
+  }
+  .dtable tbody td.strong {
+    color: var(--ink);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+
+  /* =======================================================================
+     Aura field-ops surfaces
+     A warmer, more expressive layer used on the field panels: tinted stat
+     tiles, a gradient hero, colour-railed record cards and pill controls.
+     Everything is token-driven so a caller only supplies the hue.
+     ======================================================================= */
+
+  /* ---- Hero banner ----
+     Was a three-stop pastel wash (mint → powder blue → lilac). Three unrelated
+     hues on the most prominent surface in the app is the single most generic
+     move available, and it fought the petrol accent it sat next to.
+     Now: one material. A white panel lit from the top-right by the accent
+     itself, with a hairline and a fine rule grid for texture. Colour comes
+     from the brand or not at all. */
+  /* The panel masthead.
+     Was a gradient panel with a decorative SVG of "files crossing an
+     approval gate" — filler that said nothing about the page it topped.
+     It is now typographic: a rule above, the title, and air. The structure
+     comes from the type and the hairline, which is the whole argument of
+     this design language in one component. */
+  .hero {
+    position: relative;
+    border: 0;
+    border-top: 2px solid var(--ink);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* ---- Masthead typography ----
+
+     The eyebrow goes quiet and the title opens up — the two halves of one
+     change. A page label set in the accent, beside a tinted icon plate, was
+     competing with the title directly under it for the first read; it is a
+     label, and a label's whole job is to be available without being looked
+     at. Muted ink and a bare glyph give it back that job.
+
+     The title takes the space the label gave up. Display type at this size
+     was set on the product's negative display tracking, which is right for a
+     headline that has to hold together as a shape and wrong for two words
+     standing alone at the top of a screen — tight tracking there reads as
+     cramped rather than as confident. Positive tracking lets each letter
+     stand on its own, which is what makes a two-word title look set rather
+     than typed.
+
+     Scoped to the two masthead components. Every other `.page-title` in the
+     product sits inside something and keeps the tighter default. */
+  .console-head .page-title,
+  .hero .page-title {
+    letter-spacing: 0.035em;
+  }
+
+  .console-head .eyebrow {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    color: var(--ink-3) !important;
+  }
+  /* The glyph loses its tinted plate and becomes a mark beside the label. */
+  .console-head .eyebrow-mark {
+    background: transparent !important;
+    color: var(--ink-3) !important;
+    width: 15px !important;
+    height: 15px !important;
+    border-radius: 0 !important;
+  }
+
+  /* ---- Part scope control ----
+     A labelled segmented control rather than three loose pills: the tag on
+     the left says what the choice is ABOUT, which is the thing three bare
+     letters cannot. Reads as one object, sits under the title, and the chosen
+     half is the only lit thing in it. */
+  .part-filter {
+    display: inline-flex;
+    align-items: stretch;
+    border-radius: 999px;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface);
+    overflow: hidden;
+    box-shadow: var(--shadow-xs);
+  }
+  .part-filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 11px 0 12px;
+    border-right: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .part-filter-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+  }
+  .part-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    white-space: nowrap;
+    transition:
+      background 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .part-filter-btn:hover:not([data-on]) {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .part-filter-btn[data-on] {
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: 0 2px 8px -3px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  .part-filter-count {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 700;
+    opacity: 0.62;
+  }
+
+  /* ---- Console masthead ----
+     Title left, orientation right. Stacks below 1024px, where two columns of
+     a sentence each would be narrower than either deserves. */
+  .console-head {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  @media (min-width: 1024px) {
+    .console-head {
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 32px;
+    }
+  }
+  .console-head-aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+  }
+  @media (min-width: 1024px) {
+    .console-head-aside {
+      align-items: flex-end;
+      max-width: 46ch;
+    }
+  }
+
+  /* Set against a hairline, so it reads as a note in the margin rather than
+     as a sentence that happens to be over there. The rule is the same 2px
+     ink mark the panel mastheads open with, turned on its side — one idea
+     stated in one language across the product. */
+  .console-intro {
+    padding-left: 11px;
+    border-left: 2px solid var(--rule-strong);
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  @media (min-width: 1024px) {
+    .console-intro {
+      text-align: left;
+    }
+  }
+
+  /* ---- Masthead split ----
+     Type left, the page's own numbers right. Stacks on a narrow window: two
+     columns of three words each is worse than one column of six.
+
+     The rail is set on a baseline with the headline rather than the eyebrow,
+     so the figures sit against the largest thing on the page and read as its
+     summary rather than as a caption to the label above it. */
+  .hero-split {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  @media (min-width: 900px) {
+    .hero-split {
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 28px;
+    }
+  }
+
+  .hero-rail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 22px;
+    padding-bottom: 2px;
+  }
+
+  /* No boxes. Each reading is a figure over a label with a hairline above it
+     — the same rule the masthead itself opens with, restated small. Boxing
+     them would make three cards out of what is one summary, and the page has
+     real cards further down that would then be competing with these. */
+  .hero-fact {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    padding-top: 7px;
+    border-top: 2px solid var(--rule-strong);
+  }
+  .hero-fact[data-accent] {
+    border-top-color: var(--accent);
+  }
+  .hero-fact-value {
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .hero-fact[data-accent] .hero-fact-value {
+    color: var(--accent-ink);
+  }
+  .hero-fact-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+
+  /* A 22px rule grid, barely there — gives the panel a drafting-table tooth
+     instead of the flat vector look of a plain gradient. */
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--ink) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--ink) 4%, transparent) 1px, transparent 1px);
+    background-size: 22px 22px;
+    /* fades out to the right so it never competes with the artwork */
+    mask-image: linear-gradient(100deg, #000 0%, rgba(0, 0, 0, 0.5) 42%, transparent 72%);
+    pointer-events: none;
+  }
+
+  /* The per-column filter handle.
+     Idle it is nearly invisible — fifteen funnels lit at full strength across
+     a header is a row of noise, and the control only matters at the moment
+     someone is looking for it. It comes up on hover of its own column and
+     stays lit for good once that column carries a filter, which is what makes
+     a narrowed table say WHICH column narrowed it. */
+  .tt-funnel {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    border-radius: 4px;
+    color: var(--ink-3);
+    opacity: 0.28;
+    transition:
+      opacity 0.15s var(--ease-standard),
+      background 0.15s var(--ease-standard),
+      color 0.15s var(--ease-standard);
+  }
+  th:hover > span > .tt-funnel,
+  .tt-funnel:focus-visible {
+    opacity: 0.75;
+  }
+  .tt-funnel:hover {
+    opacity: 1;
+    background: var(--surface-3);
+    color: var(--ink);
+  }
+  .tt-funnel[data-on] {
+    opacity: 1;
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  /* ---- Territory table ----
+     Built for a book of fifty patches rather than six.
+
+     The two header rows are pinned, because a table you scroll is a table
+     whose headings leave — and every row below the fold then reads as
+     unlabelled numbers. They are pinned at explicit offsets: the band row is
+     given a fixed height so the column row knows exactly where to stop, which
+     is deterministic where measuring at runtime is not.
+
+     The rules are drawn with inset shadows rather than borders. Under
+     `border-collapse` a sticky cell leaves its borders behind when it detaches
+     — a well-known gap in the spec's interaction with sticky — and the result
+     is a floating header with no line under it. A shadow travels with the
+     cell. */
+  .tt-scroll-tall {
+    /* One number, read by both header rows. The second row pins directly
+       beneath the first, so if these two ever disagree the band row slides
+       under the column row by the difference — which is exactly the kind of
+       four-pixel bug nobody reports and everybody sees. */
+    --tt-band-h: 30px;
+    max-height: min(64vh, 680px);
+  }
+  /* The z-stack, in one place so it can be reasoned about:
+       body first column  10  (sticky left, set on the cell)
+       pinned totals row  11  ·  its first cell 13
+       pinned headers     12  ·  their first cells 14
+     The header has to outrank the sticky COLUMN, not just the ordinary rows —
+     otherwise the first column scrolls up through its own heading, which is
+     what happened the first time this was pinned. */
+  .tt-table thead .tt-band th {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    height: var(--tt-band-h, 30px);
+    padding-top: 0;
+    padding-bottom: 0;
+    background: var(--surface);
+  }
+  .tt-table thead .tt-cols th {
+    position: sticky;
+    top: var(--tt-band-h, 30px);
+    z-index: 12;
+    background: var(--surface);
+    box-shadow: inset 0 -1px 0 var(--rule-strong);
+  }
+  /* The corner: sticky in both axes at once, so it has to outrank both the
+     row it sits in and the column it pins. */
+  .tt-table thead .tt-band th:first-child,
+  .tt-table thead .tt-cols th:first-child {
+    z-index: 14;
+  }
+  /* The totals row is the other thing worth never losing: pinned to the foot
+     so a manager comparing one territory against the book does not have to
+     scroll fifty rows to find what the book totals. */
+  .tt-scroll-tall .tt-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 11;
+    /* On the cells, not the row. A sticky <td> detaches from its <tr>, and a
+       background declared on the row does not travel with it — so the pinned
+       totals sat transparent with the rows scrolling visibly underneath. */
+    background: var(--surface-2);
+    box-shadow: inset 0 1px 0 var(--rule-strong);
+  }
+  .tt-scroll-tall .tt-table tfoot td:first-child {
+    z-index: 13;
+  }
+  /* A slightly warmer hover than the default row, since at this density the
+     row under the cursor is the only thing anchoring the eye across twelve
+     columns. */
+  .tt-table tbody tr:hover {
+    background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  }
+
+  /* ---- Dot veil ----
+     The rule grid above is drawn in ink, for a white panel. This is its
+     counterpart for a deep-coloured one: a field of white dots, faded in
+     from the left along the same 112° diagonal both cards that use it run
+     their gradient on — so the texture arrives along the axis the colour is
+     already travelling instead of cutting across it.
+
+     A repeating radial gradient rather than an image: one declaration, no
+     request, and it re-tiles to any card width for free. Absolutely
+     positioned and inert, so a card adopts it by dropping one empty div in
+     as its first child and needs nothing else from the markup.
+
+     The storefront masthead runs the same technique under its own name
+     (`.sf-hero-dots`). That one is kept separate deliberately — its place in
+     the cascade is load-bearing, since it has to be declared after
+     `.sf-hero > *` or that rule drags it back into normal flow. */
+  .dot-veil {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.34) 1px, transparent 1.6px);
+    background-size: 15px 15px;
+    mask-image: linear-gradient(
+      112deg,
+      transparent 0%,
+      transparent 28%,
+      #000 62%,
+      rgba(0, 0, 0, 0.55) 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      112deg,
+      transparent 0%,
+      transparent 28%,
+      #000 62%,
+      rgba(0, 0, 0, 0.55) 100%
+    );
+  }
+
+  /* ---- Tinted stat tile ----
+     Caller sets the tint family; the values come from tokens.
+
+     Restructured to read label → figure → caption with the glyph parked in
+     the top-right corner. The glyph used to sit above the number and pushed
+     every tile ~28px taller for an icon nobody reads before the figure. */
+  /* A figure, not a card.
+     Six gradient-washed tiles in a row was the single most template-looking
+     thing in the product: colour was applied per tile, so the row read as
+     decoration and no tile could rank above another. Every tile is now the
+     same flat surface, and semantic state lives in the glyph.
+
+     It used to live in a 2px rail down the left edge. The rail worked, but it
+     was one of several left-edge markers across the product — tiles, readings,
+     repair lines, resale rows — and a left border repeated on every kind of
+     surface stops being a signal and becomes a house style. Colour is still
+     information; it is just carried by the icon, which was already there and
+     already sized to be seen.
+
+     Also 20% shorter than a card: the padding was sized for one, and these are
+     meant to be scanned in a row. */
+  .stat-tile {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    padding: 8px 11px 9px 12px;
+    background: var(--surface);
+    transition:
+      border-color 0.18s var(--ease-standard),
+      box-shadow 0.24s var(--ease-out-quart),
+      transform 0.24s var(--ease-out-quart);
+  }
+  .stat-tile:hover {
+    border-color: var(--rule-strong);
+  }
+
+  /* ---- Aura variant ----
+     The field panels — ARO recovery, and anywhere else a small set of tiles IS
+     the top of the page — take a tinted wash instead of the flat surface: one
+     material, lit from the top-left corner, faded out well before the caption
+     so the figure stays the loudest thing in the tile. The desk portals keep
+     the flat surface; eight of these across a dense desktop header would be
+     decoration, which is the thing the flat tile was for.
+
+     Same construction as the engineer's bench tiles, deliberately: two field
+     surfaces built from one material read as one product. */
+  .stat-tile[data-aura="true"] {
+    border-color: color-mix(in srgb, var(--tint-accent) 22%, var(--rule));
+    background: linear-gradient(
+      158deg,
+      var(--tint-from, var(--surface)),
+      var(--tint-to, var(--surface)) 74%
+    );
+  }
+  .stat-tile[data-aura="true"]:hover {
+    border-color: color-mix(in srgb, var(--tint-accent) 42%, var(--rule));
+  }
+
+  /* ---- Flat tinted ground ----
+     The same idea as the aura wash — the tile carries its own colour rather
+     than borrowing the sheet's — but as ONE solid mix instead of a two-stop
+     gradient over translucent rgba.
+
+     The gradient version reads as glass: it has a light source, it implies
+     depth, and stacked against the tinted chips and icon plates around it the
+     field panel started to look like frosted panes rather than paper. This is
+     a single colour, mixed from the same tint token, and it sits flat.
+
+     `color-mix` against `--surface` rather than a fixed rgba, so the tint
+     stays correct if the sheet colour ever moves. */
+  /* ---- Deep tinted ground ----
+     The desk headers went from an 8% wash to the tint at full strength, cut
+     into a near-black so it reads as a saturated material rather than as a
+     bright swatch. A row of six pastel rectangles across the top of a desktop
+     console reads as a legend; six deep ones read as the panel itself, and the
+     figure on them is the brightest thing on the page — which is what these
+     tiles exist to make true.
+
+     Still one colour per tile, mixed from the same `--tint-accent` token the
+     soft version used, so a tile means exactly what it meant before: the tint
+     is information, and only its weight has changed. */
+  .stat-tile:not([data-ground="aura"]) {
+    border-color: transparent;
+    color: #fff;
+    background-color: var(--tile-deep);
+    /* A close two-stop wash, not a fade. The stops sit ~18% apart instead of
+       ~32%: at the old spread the corner of every tile went visibly black and
+       the row read as six plastic buttons catching a light. A narrow delta
+       reads as one lacquered surface with a sheen on it, which is the whole
+       difference between a saturated rectangle and a considered one. */
+    background-image: linear-gradient(
+      158deg,
+      color-mix(in srgb, var(--tile-deep) 100%, #05070f) 0%,
+      color-mix(in srgb, var(--tile-deep) 82%, #05070f) 100%
+    );
+    box-shadow:
+      /* The lit top edge. One hairline of light along the inside of the top
+         border is what separates enamel from flat colour — it implies the
+         tile has a thickness and something above it to catch. */
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      /* A fine ring, so the tile has an edge without carrying a border that
+         would fight the fill. */
+      0 0 0 1px rgba(255, 255, 255, 0.05),
+      0 1px 2px rgba(5, 7, 15, 0.3),
+      0 12px 24px -18px color-mix(in srgb, var(--tile-deep) 60%, #05070f);
+  }
+
+  /* A field of dots across the fill, fading out along the same 158° axis the
+     gradient travels — so the texture arrives on the axis the colour is
+     already moving rather than cutting across it. The same technique the
+     masthead and the recovery card use, at a quarter of the strength: on a
+     tile this small it should register as grain in the surface, not as a
+     pattern printed on it. You should notice it only if you look for it. */
+  .stat-tile:not([data-ground="aura"])::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.5) 0.9px, transparent 1.3px);
+    background-size: 13px 13px;
+    opacity: 0.22;
+    mask-image: linear-gradient(158deg, #000 0%, rgba(0, 0, 0, 0.4) 52%, transparent 86%);
+    -webkit-mask-image: linear-gradient(158deg, #000 0%, rgba(0, 0, 0, 0.4) 52%, transparent 86%);
+  }
+  /* The veil is absolutely positioned, so it would otherwise paint over the
+     tile's own static text. Lifting the copy rather than pushing the veil
+     behind: a negative z-index would escape the tile entirely, since nothing
+     here establishes a stacking context to trap it. */
+  .stat-tile:not([data-ground="aura"]) > div {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---- The desk ramp: violet to blue ----
+     One family across the whole row rather than six unrelated hues. The tints
+     still mean what they meant — the token names are unchanged and every other
+     surface in the product still reads them as amber, red and green — but on
+     these deep cards they are expressed as positions along a single violet →
+     blue ramp instead of as separate colours.
+
+     What that buys: six cards that read as one instrument rather than as a
+     legend, which is the difference between a console and a dashboard tour.
+     What it costs is stated plainly: `warn` and `bad` no longer shout on these
+     tiles. They still shout everywhere it decides something — the attention
+     rows below them, the exception columns in the territory table, the case
+     clocks — so nothing that needs to be alarming has stopped being alarming.
+     It is only the summary row that has gone quiet, and a summary row is read
+     for its figures, not its colours. */
+  .stat-tile:not([data-ground="aura"]) {
+    --tile-deep: #4b39b8;
+  }
+  .stat-tile:not([data-ground="aura"])[data-tint="accent"] {
+    --tile-deep: #4b39b8;
+  }
+  .stat-tile:not([data-ground="aura"])[data-tint="bad"] {
+    --tile-deep: #4539b0;
+  }
+  .stat-tile:not([data-ground="aura"])[data-tint="warn"] {
+    --tile-deep: #3f3aa8;
+  }
+  .stat-tile:not([data-ground="aura"])[data-tint="neutral"] {
+    --tile-deep: #393ca1;
+  }
+  .stat-tile:not([data-ground="aura"])[data-tint="info"] {
+    --tile-deep: #333e9a;
+  }
+  .stat-tile:not([data-ground="aura"])[data-tint="ok"] {
+    --tile-deep: #2d4093;
+  }
+  /* The ink ramp is built for light surfaces and turns to mud on these, so the
+     tile's own type is re-tuned rather than inherited. Scoped to the solid
+     ground only — the flat and aura tiles are still paper. */
+  .stat-tile:not([data-ground="aura"]) .text-ink {
+    color: #fff;
+  }
+  /* 0.8, not the 0.66 the deeper ramp could carry. Lifting the fill lifted
+     the floor with it, and at 0.74 the captions on the blue end of the ramp
+     were sitting exactly on the 4.5:1 line rather than comfortably past it. */
+  .stat-tile:not([data-ground="aura"]) .text-ink-3 {
+    color: rgba(255, 255, 255, 0.8);
+  }
+  /* The glyph gets a plate on the deep tiles.
+     Bare, it was a white icon floating on a coloured field with nothing
+     holding it — fine on paper, weightless here. A translucent tile gives it
+     an object to sit in and, more usefully, repeats the tile's own corner
+     radius at a smaller size, which is what makes a card read as designed
+     rather than assembled. */
+  .stat-tile:not([data-ground="aura"]) .stat-glyph {
+    top: 8px;
+    right: 9px;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    color: rgba(255, 255, 255, 0.92);
+    opacity: 1;
+  }
+  .stat-tile:not([data-ground="aura"]):hover .stat-glyph {
+    background: rgba(255, 255, 255, 0.2);
+    transform: none;
+  }
+  /* The label clears the wider plate. */
+  .stat-tile:not([data-ground="aura"]) > div:first-of-type {
+    padding-right: 34px;
+  }
+  /* `!important` because the trend badge carries its own colour inline, and a
+     dark green on a dark ground is unreadable. The arrow still says which way
+     the number went, so nothing is lost by making the text white. */
+  .stat-tile:not([data-ground="aura"]) .trend-badge {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .stat-tile:not([data-ground="aura"]):hover {
+    border-color: transparent;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 2px 4px rgba(5, 7, 15, 0.34),
+      0 20px 36px -20px color-mix(in srgb, var(--tile-deep) 75%, #05070f);
+  }
+  /* Picked-out state, for the tiles that double as filters. A ring rather than
+     a colour change: the tint is already at full strength, so there is nowhere
+     brighter for "selected" to go. */
+  .stat-tile:not([data-ground="aura"])[data-picked="true"] {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.5),
+      0 18px 34px -18px color-mix(in srgb, var(--tile-deep) 85%, transparent);
+  }
+
+  .stat-tile:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--rule-strong);
+    /* A single pixel. Enough to register as "this responds"; more than that
+       on a grid of tiles reads as the page wobbling. */
+    transform: translateY(-1px);
+  }
+  button.stat-tile:active {
+    transform: translateY(0) scale(0.994);
+    box-shadow: var(--shadow-xs);
+    transition-duration: 0.09s;
+  }
+  /* Bottom accent — grows from the left edge on hover. */
+  /* The bottom accent bar is gone. With state moved to the left-edge marker
+     this was a second marker saying the same thing, on every tile including
+     the ones with nothing to report. */
+
+  .stat-glyph {
+    position: absolute;
+    top: 9px;
+    right: 10px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    /* The tint, always — this is where state is read from now. Neutral
+       resolves to its own muted ink, so an unremarkable figure still looks
+       unremarkable. */
+    color: var(--tint-accent, var(--ink-3));
+    opacity: 0.85;
+    transition: opacity 0.2s var(--ease-standard);
+  }
+  .stat-tile:hover .stat-glyph {
+    opacity: 1;
+  }
+
+  .stat-tile:hover .stat-glyph {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  .trend-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  /* ---- Pill search ---- */
+  .pill-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    transition:
+      border-color 0.2s var(--ease-standard),
+      box-shadow 0.2s var(--ease-standard);
+  }
+  .pill-search:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  .pill-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    padding: 12px 14px 12px 0;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .pill-search input::placeholder {
+    color: var(--ink-3);
+  }
+
+  /* ---- Gradient CTA ---- */
+  /* Retained so callsites compile; it is no longer a gradient. */
+  .btn-gradient {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+  }
+
+  .btn-gradient:hover:not(:disabled) {
+    background: var(--accent-2);
+  }
+
+  /* ---- Floating-label field ---- */
+  .float-field {
+    position: relative;
+  }
+  .float-field > .float-label {
+    position: absolute;
+    top: 6px;
+    left: 12px;
+    z-index: 1;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    pointer-events: none;
+  }
+  .float-field > .field {
+    padding-top: 21px;
+    padding-bottom: 7px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  /* ---- Labelled FAB ---- */
+  .fab {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    color: var(--on-accent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 8px 22px -6px rgba(85, 70, 224, 0.5);
+    transition: transform 0.22s var(--ease-out-quart), box-shadow 0.22s var(--ease-standard);
+  }
+  .fab:hover {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      0 12px 28px -6px rgba(85, 70, 224, 0.55);
+  }
+  .fab:active {
+    transform: scale(0.94);
+  }
+  /* Extended (labelled) FAB — a pill instead of a circle-plus-caption, so the
+     label never stacks over the card actions underneath it. */
+  .fab-ext {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 46px;
+    padding: 0 17px 0 13px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 13.5px;
+    letter-spacing: -0.005em;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    color: var(--on-accent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 8px 22px -8px rgba(85, 70, 224, 0.55);
+    transition:
+      transform 0.22s var(--ease-out-quart),
+      box-shadow 0.22s var(--ease-standard);
+  }
+  .fab-ext:hover {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      0 12px 28px -8px rgba(85, 70, 224, 0.6);
+  }
+  .fab-ext:active {
+    transform: scale(0.96);
+  }
+
+  /* ---- Desk action panel ----
+     The one surface on a vehicle page that the current desk can act on. It
+     earns more presence than a plain card: a gradient hairline along the top
+     edge and a faint accent wash behind the heading, so the eye lands on
+     "what I must do" before "what I'm looking at". */
+  .action-panel {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+  }
+  .action-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2) 60%, var(--ok));
+  }
+  .action-panel::after {
+    /* Accent wash that fades out behind the heading. */
+    content: "";
+    position: absolute;
+    inset: 3px 0 auto 0;
+    height: 92px;
+    background: linear-gradient(180deg, var(--accent-soft), transparent);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .action-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---- Backdrop / Modal ---- */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(14, 17, 22, 0.44);
+    /* The one blur that earns its place: it separates a dialog's plane from
+       a whole page behind it. Halved, and the saturation boost dropped — the
+       page beneath should read as dimmed, not as processed. */
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    display: grid;
+    padding: 16px;
+    animation: fadeIn 0.18s var(--ease-standard);
+    /* Stop scroll chaining through to the page behind the dialog. */
+    overscroll-behavior: contain;
+  }
+  /* Bottom sheet on small screens.
+     `end` pins it to the bottom; the inline axis must be `center`, NOT
+     `stretch`. A stretched grid item that also carries a max-width (see
+     .modal-panel, capped at 420px) cannot fill the track, and the leftover
+     space all falls on one side — which put every action dialog in the
+     bottom-LEFT corner on any window under 640px instead of centred. */
+  .backdrop-mobile {
+    place-items: end center;
+  }
+  .backdrop-center {
+    place-items: center;
+  }
+  /* For bottom sheets: flush to the bottom edge and the full width, with the
+     backdrop's own padding dropped — a sheet with a 16px margin around it
+     reads as a dialog that failed to dock rather than as a sheet. */
+  .backdrop-sheet {
+    place-items: end stretch;
+    padding: 0;
+  }
+  @media (min-width: 640px) {
+    .backdrop-sheet {
+      place-items: center;
+      padding: 16px;
+    }
+  }
+  @media (min-width: 640px) {
+    .backdrop-mobile {
+      place-items: center;
+    }
+  }
+  .modal-panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    width: 100%;
+    /* Callers set max-width via a Tailwind size class (max-w-sm/md/lg).
+       Keep a floor here so a size-less dialog still renders. */
+    max-width: 420px;
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    animation: slideUp 0.22s var(--ease-standard);
+  }
+  @media (min-width: 640px) {
+    .modal-panel {
+      animation: scaleIn 0.2s var(--ease-standard);
+    }
+  }
+
+  /* ---- Skeleton loader ---- */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-3) 25%, var(--surface-2) 50%, var(--surface-3) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+  }
+
+  /* ---- Toast ---- */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    pointer-events: none;
+  }
+  @media (max-width: 640px) {
+    .toast-container {
+      bottom: 88px;
+      right: 16px;
+      left: 16px;
+    }
+  }
+  .toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    animation: toastIn 0.3s var(--ease-out-expo);
+    max-width: 420px;
+  }
+  .toast-exit {
+    animation: toastOut 0.2s ease-in forwards;
+  }
+  .toast-ok {
+    background: var(--ok);
+    color: #fff;
+  }
+  .toast-bad {
+    background: var(--bad);
+    color: #fff;
+  }
+  .toast-neutral {
+    background: var(--ink);
+    color: #fff;
+  }
+
+  /* ---- Search bar ---- */
+  .search-bar {
+    position: relative;
+  }
+  .search-bar svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink-3);
+    pointer-events: none;
+  }
+  .search-bar input {
+    padding-left: 38px;
+  }
+  .search-bar .search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 4px;
+    border-radius: 4px;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .search-bar .search-clear:hover {
+    color: var(--ink);
+  }
+  /* Trailing key hint (e.g. "/") — sits where the clear button would. */
+  .search-bar .search-hint {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  /* ---- Count badge ---- */
+  .count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  /* ---- Avatar ---- */
+  .avatar {
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    user-select: none;
+  }
+  .avatar-sm {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+  .avatar-md {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+
+  /* ---- Lightbox ---- */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.85);
+    display: grid;
+    place-items: center;
+    animation: fadeIn 0.2s ease-out;
+    cursor: zoom-out;
+  }
+  .lightbox img {
+    max-width: 92vw;
+    max-height: 90vh;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-xl);
+    object-fit: contain;
+    animation: scaleIn 0.25s var(--ease-out-expo);
+  }
+
+  /* ---- Stat card ---- */
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-xs);
+    transition: transform 0.2s var(--ease-out-expo), box-shadow 0.2s ease;
+  }
+  .stat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* ---- Kbd (keyboard shortcut) ---- */
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 4px;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--ink-3);
+    box-shadow: 0 1px 0 var(--rule-strong);
+  }
+
+  /* ---- Divider ---- */
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: var(--rule);
+    margin: 0;
+    border: 0;
+  }
+
+  /* ---- Progress bar ---- */
+  .progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--surface-3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.4s var(--ease-out-expo);
+  }
+}
+

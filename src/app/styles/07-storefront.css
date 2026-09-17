@@ -1,0 +1,1458 @@
+/* ==========================================================================
+   Storefront — the Marketplace, built for a phone first
+   --------------------------------------------------------------------------
+   The people who sell out of this catalogue are standing in a yard holding a
+   phone, so every rule below is written for a 375px screen and then relaxed
+   upward. Three consequences run through the whole file:
+
+     1. Nothing wraps that could scroll sideways instead. A filter row that
+        wraps to three lines on a phone costs 96px of stock; the same row as
+        one swipeable track costs 40px and reads as a control rather than as
+        clutter.
+     2. Chrome is rationed. The masthead, the facets and the card padding were
+        each cut until the FIRST VEHICLE sits inside the opening screen.
+     3. Sheets come up from the bottom edge, where a thumb is, not out of the
+        middle of the screen, where a mouse is.
+
+   The desk roles get the same catalogue widened out — the phone layout is the
+   base, not a stripped-down alternate.
+   ========================================================================== */
+
+@layer components {
+  /* Page gutter. Deliberately tight on a phone: 14px of margin against a
+     375px screen is 7% of the width, and the photographs need the rest. */
+  .sf-page {
+    padding: 12px 14px calc(28px + env(safe-area-inset-bottom));
+    /* `width: 100%` alongside the auto margins.
+       Both shells wrap the page in a column flex container, and `margin: auto`
+       on a flex item disables the stretch — so without an explicit width this
+       sized to fit-content and grew to its widest descendant, taking the page
+       to 696px on a 320px phone. */
+    width: 100%;
+    margin: 0 auto;
+    max-width: 1560px;
+    /* A wash, not a colour change — the flat `--paper` behind every other desk
+       reads as an admin tool, which this page deliberately is not. Anchored
+       to the masthead so it reads as light falling from the band above,
+       rather than as a tint applied to the page. */
+    background: radial-gradient(
+      1100px 420px at 50% 0px,
+      color-mix(in srgb, var(--accent) 5%, transparent),
+      transparent 72%
+    );
+    background-repeat: no-repeat;
+  }
+  @media (min-width: 640px) {
+    .sf-page {
+      padding: 20px 22px 40px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .sf-page {
+      padding: 24px 28px 48px;
+    }
+  }
+
+  /* ---- Masthead -------------------------------------------------------- */
+
+  /* A compact colour band, not a hero.
+
+     Flat, saturated accent rather than the pale glassy wash it replaced: at
+     this height a tinted white panel reads as an empty gap above the stock,
+     while a solid band reads as a header and takes half the room doing it.
+     The gradient is a single hue shifting across two stops — a shade, not a
+     rainbow — so it stays calm behind white type.
+
+     One deliberate piece of movement: the band's sheen drifts slowly across
+     it. Slow enough that nobody watches it, present enough that the page does
+     not feel like a screenshot. */
+  /* The storefront masthead.
+     The marketplace is a different mode from the desks — people browse it —
+     so it keeps a solid block rather than going fully typographic. Still one
+     hue travelling the band rather than a rainbow crossing it, but the hue is
+     now the accent itself, dark to bright, instead of a mostly-ink wash with
+     the accent only arriving at the edge — that read as a dark admin panel
+     that happened to have a purple corner, not as the accent's own surface.
+     The dot field and colour blooms (below) run at every width now, not just
+     tablet-up: they cost no image request, so there is no phone-height
+     argument against them the way there was against a photograph. */
+  .sf-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 10px;
+    padding: 14px 16px 15px;
+    border-radius: var(--radius);
+    background: linear-gradient(125deg, #1a1340 0%, var(--accent-ink) 42%, var(--accent) 78%, var(--accent-2) 115%);
+    color: #fff;
+  }
+
+  @media (min-width: 640px) {
+    .sf-hero {
+      margin-bottom: 14px;
+      padding: 20px 24px 21px;
+      border-radius: var(--radius-xl);
+    }
+  }
+
+  /* The drifting sheen. A wide, very soft highlight travelling left to right
+     on a long loop. `background-position` animates on the compositor and
+     costs nothing. */
+  .sf-hero::before {
+    content: none;
+  }
+
+
+  /* A hairline of light along the top edge, so the band reads as a lit
+     surface rather than a flat fill. */
+  .sf-hero::after {
+    content: none;
+  }
+
+  .sf-hero > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* A field of dots, faded in from the left so it reads as texture the band
+     is made of rather than a sticker laid on top of it. A repeating radial
+     gradient rather than an SVG or an image: one declaration, no request,
+     scales to any band width for free.
+     Declared AFTER `.sf-hero > *` on purpose — that rule also matches this
+     element (equal specificity, later wins), and its `position: relative`
+     would otherwise beat the `absolute` below and drop this into normal
+     flow, inflating the band to its own height. */
+  .sf-hero-dots {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1.6px);
+    background-size: 16px 16px;
+    mask-image: linear-gradient(115deg, transparent 0%, transparent 34%, #000 64%, rgba(0, 0, 0, 0.65) 100%);
+    -webkit-mask-image: linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 34%,
+      #000 64%,
+      rgba(0, 0, 0, 0.65) 100%
+    );
+  }
+
+  /* Two soft blooms in the brand's own blue and purple, lighting the dot
+     field from behind rather than sitting flat on top of it. Same ordering
+     note as `.sf-hero-dots` above applies here too. */
+  .sf-hero-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(420px 220px at 88% 6%, color-mix(in srgb, var(--brand-blue) 55%, transparent), transparent 72%),
+      radial-gradient(340px 260px at 102% 102%, color-mix(in srgb, var(--brand-purple) 48%, transparent), transparent 72%);
+  }
+
+  /* On the band, the eyebrow and body copy are white at reduced opacity
+     rather than the app's ink ramp — which is built for light surfaces and
+     turns to mud here. */
+  .sf-hero .eyebrow {
+    display: inline-block;
+    padding-bottom: 4px;
+    border-bottom: 2px solid var(--accent-2);
+    color: rgba(255, 255, 255, 0.78);
+  }
+  .sf-hero-sub {
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .sf-headline {
+    font-family: var(--font-display);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-size: 25px;
+    color: #fff;
+  }
+  @media (min-width: 640px) {
+    .sf-headline {
+      font-size: clamp(28px, 3.4vw, 38px);
+      line-height: 0.98;
+    }
+  }
+
+  /* Search sits ON the band, so it is a solid white pill — the one bright
+     object, and unmistakably the thing to type into. */
+  .sf-search {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    height: 44px;
+    padding: 0 13px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    background: #fff;
+    box-shadow: 0 2px 10px -2px rgba(17, 17, 28, 0.28);
+    transition: box-shadow 0.18s var(--ease-standard);
+  }
+  @media (min-width: 640px) {
+    .sf-search {
+      height: 46px;
+      padding: 0 15px;
+    }
+  }
+  .sf-search:focus-within {
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.45),
+      0 4px 14px -2px rgba(17, 17, 28, 0.3);
+  }
+  .sf-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    /* 16px stops iOS zooming the page when the field takes focus. */
+    font-size: 16px;
+    color: var(--ink);
+  }
+  .sf-search input::placeholder {
+    color: var(--ink-3);
+  }
+
+  /* Facts as icon tiles rather than text pills: a small glass swatch for the
+     glyph, two lines of type beside it. The extra structure earns its keep
+     precisely because there are five of these in a row — a stat that has to
+     be READ, not just glanced past, wants its number sized like a number and
+     its label sized like a caption, and a single-line pill cannot give it
+     both. */
+  .sf-fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px 5px 5px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+  }
+  .sf-fact-icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+  }
+  .sf-fact-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.05;
+  }
+  .sf-fact-text strong {
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .sf-fact-text em {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  /* ---- Swipeable tracks ------------------------------------------------ */
+
+  /* Any row that would otherwise wrap. The mask fades the cut edge so a
+     half-visible chip reads as "there is more this way" rather than as a
+     clipping bug, and the fade is dropped once everything fits. */
+  .sf-track {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+    /* Bleed to the page edge so the track looks like it continues off-screen. */
+    margin-inline: -14px;
+    padding-inline: 14px;
+    padding-block: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* A little room past the last chip, so it never sits flush against the edge
+     of the scroller when you reach the end. */
+  .sf-track::after {
+    content: "";
+    flex: 0 0 4px;
+  }
+  .sf-track::-webkit-scrollbar {
+    display: none;
+  }
+  .sf-track > * {
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+  }
+  /* Above `sm` it only loses the page-edge bleed. It does NOT start wrapping:
+     a control row that reflows to three lines on a narrow window pushes the
+     stock below the fold, and the whole rail exists to stay out of the way. */
+  @media (min-width: 640px) {
+    .sf-track {
+      margin-inline: 0;
+      padding-inline: 0;
+    }
+  }
+
+  /* A duplicate .sf-fact lived here and won on source order, which is why the
+     chips stayed white pills after the masthead went to ink. Removed — the
+     single definition is with the masthead, where it can be read against the
+     surface it actually sits on. */
+
+  /* ---- Filter rail ----------------------------------------------------- */
+
+  /* One line, always. Sticks under whatever bar the shell keeps at the top
+     (see --shell-top) so the controls stay reachable down a long list. */
+  .sf-rail {
+    position: sticky;
+    top: var(--shell-top, 0px);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-inline: -14px;
+    padding: 7px 14px;
+    /* Flat, opaque. A blurred rail over a near-solid page ground spends a
+       backdrop-filter to look like the page ground. */
+    background: var(--paper);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s var(--ease-standard), box-shadow 0.2s var(--ease-standard);
+  }
+  @media (min-width: 640px) {
+    .sf-rail {
+      margin-inline: 0;
+      padding-inline: 0;
+      /* The rail itself must NOT wrap. Filters is pinned left and the density
+         toggle right; only the chip track between them wraps. Letting the rail
+         wrap instead drops the Filters button into the middle of the second
+         row of grade pills, which reads as one of them. */
+      flex-wrap: nowrap;
+    }
+  }
+  .sf-rail[data-stuck="true"] {
+    border-bottom-color: var(--rule);
+    box-shadow: 0 6px 16px -12px rgba(28, 24, 68, 0.4);
+  }
+  /* The rail's own scroller sits inside it, so the Filters button and the
+     sort control stay pinned while the chips move under them. */
+  .sf-rail .sf-track {
+    flex: 1;
+    min-width: 0;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+  .sf-rail .sf-track::after {
+    content: "";
+    flex: 0 0 6px;
+  }
+
+  /* Pill filters — fully rounded, not the squared-off chips this used to be.
+     A facet you toggle on and off all day reads as a control, not a data tag,
+     and a control this catalogue wants to feel like jewellery, not like a
+     spreadsheet's filter row. 34px tall — under Apple's 44 but with 7px of
+     gap either side, which is the tap target that actually matters. */
+  .sf-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 29px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard),
+      transform 0.14s var(--ease-spring);
+  }
+  .sf-pill:hover:not(:disabled) {
+    border-color: var(--accent-line);
+    color: var(--ink);
+  }
+  .sf-pill:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+  .sf-pill[data-on="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .sf-pill[data-on="true"]:hover {
+    background: var(--accent-2);
+    color: var(--on-accent);
+  }
+  .sf-pill-count {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    opacity: 0.62;
+  }
+  /* Carries a live filter count; reads as "there is state behind this". */
+  .sf-pill[data-active="true"] {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+  }
+
+  /* The density toggle. Was a single button that swapped its own icon — one
+     glyph standing in for two states is a control you have to try to
+     understand. Both options sit side by side now, and the active half is
+     lit, which is what makes it self-explanatory on sight rather than on
+     hover. */
+  .sf-density {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 999px;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface);
+  }
+  .sf-density-btn {
+    display: grid;
+    place-items: center;
+    width: 25px;
+    height: 25px;
+    border-radius: 999px;
+    border: 0;
+    background: transparent;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: background 0.16s var(--ease-standard), color 0.16s var(--ease-standard);
+  }
+  .sf-density-btn:hover:not([data-on="true"]) {
+    color: var(--ink);
+  }
+  .sf-density-btn[data-on="true"] {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .sf-select {
+    height: 29px;
+    padding: 0 25px 0 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule-strong);
+    background-color: var(--surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237d7d92' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .sf-select:hover {
+    border-color: var(--accent-line);
+  }
+  .sf-select[data-on="true"] {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    background-color: var(--accent-soft);
+  }
+
+  /* ---- The catalogue --------------------------------------------------- */
+
+  /* Compact is the phone default and one column; gallery widens with the
+     viewport. The gap is 10px rather than the 16px a desktop grid wants —
+     at this card size anything larger reads as the list falling apart. */
+  .sf-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px) {
+    .sf-grid {
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1100px) {
+    .sf-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1500px) {
+    .sf-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .sf-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Floated, not boxed. A hairline border reads as a spreadsheet row; a card
+     of stock this valuable earns its edge from light, not from a rule. The
+     resting shadow is tinted with the page's own ink rather than plain
+     black — a shadow that carries the surface's hue photographs as material,
+     one that doesn't reads as an SVG icon of a shadow. */
+  .sf-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    background: var(--surface);
+    box-shadow:
+      0 1px 2px rgba(14, 17, 22, 0.045),
+      0 14px 30px -20px rgba(14, 17, 22, 0.28);
+    transition:
+      transform 0.22s var(--ease-out-quart),
+      box-shadow 0.22s var(--ease-out-quart),
+      border-color 0.22s var(--ease-out-quart);
+  }
+  @media (min-width: 640px) {
+    .sf-card {
+      border-radius: var(--radius-lg);
+    }
+  }
+  @media (hover: hover) {
+    .sf-card:hover {
+      transform: translateY(-4px);
+      /* The lift shadow plus a fine accent-tinted ring — the closest this
+         palette gets to a spotlight border without tracking the cursor. */
+      box-shadow:
+        0 2px 6px rgba(14, 17, 22, 0.06),
+        0 32px 56px -22px rgba(14, 17, 22, 0.34),
+        0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+  }
+  /* Touch has no hover to lean on, so the press itself is the feedback. */
+  .sf-card:active {
+    transform: scale(0.994);
+  }
+
+  /* 16:10 rather than 4:3 — a truck is a wide object, and the shorter frame
+     buys back ~55px per card on a phone without cropping anything that
+     matters. */
+  .sf-media {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface-2);
+    aspect-ratio: 16 / 10;
+  }
+  .sf-media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s var(--ease-out-quart);
+  }
+  @media (hover: hover) {
+    .sf-card:hover .sf-media img {
+      transform: scale(1.045);
+    }
+  }
+  /* A wash at the foot of the photo, present at rest and deepening on hover —
+     not because badges strictly need it (they carry their own backing), but
+     because a photograph with a hint of shadow at its own edges reads as lit
+     rather than as a flat crop. A single light source, top to bottom, matches
+     the sheen already running down the card above it. */
+  .sf-media::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 48%;
+    pointer-events: none;
+    background: linear-gradient(to top, rgba(14, 17, 22, 0.34), transparent);
+    opacity: 0.55;
+    transition: opacity 0.28s var(--ease-standard);
+  }
+  .sf-card:hover .sf-media::after {
+    opacity: 1;
+  }
+
+  /* The whole photograph is the way into the listing. It is its own element
+     sitting under the carousel controls rather than a button wrapped around
+     them: nesting one button inside another is invalid HTML and React will
+     not hydrate it. */
+  .sf-open {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  /* Arrows are a mouse affordance. On touch the photos are swiped, so the
+     arrows are hidden entirely rather than covering a third of the image. */
+  .sf-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: 5;
+    display: none;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    margin-top: -15px;
+    border-radius: 999px;
+    border: 0;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s var(--ease-standard), transform 0.2s var(--ease-spring);
+  }
+  @media (hover: hover) {
+    .sf-arrow {
+      display: grid;
+    }
+    .sf-card:hover .sf-arrow,
+    .sf-arrow:focus-visible {
+      opacity: 1;
+    }
+  }
+  .sf-arrow:hover {
+    transform: scale(1.1);
+  }
+  .sf-arrow:active {
+    transform: scale(0.92);
+  }
+
+  /* The swipe track itself. One photo per snap point, so a flick moves
+     exactly one frame — the gesture every phone gallery has taught. */
+  .sf-swipe {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sf-swipe::-webkit-scrollbar {
+    display: none;
+  }
+  .sf-swipe > * {
+    position: relative;
+    flex: 0 0 100%;
+    scroll-snap-align: center;
+  }
+
+  .sf-dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 7px;
+    z-index: 5;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    pointer-events: none;
+  }
+  .sf-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.58);
+    box-shadow: 0 0 0 1px rgba(17, 17, 28, 0.16);
+    transition: width 0.24s var(--ease-spring), background 0.24s var(--ease-standard);
+  }
+  .sf-dot[data-on="true"] {
+    width: 13px;
+    background: #fff;
+  }
+
+  .sf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3.5px 7px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    backdrop-filter: blur(6px);
+    white-space: nowrap;
+  }
+  .sf-badge-light {
+    background: rgba(255, 255, 255, 0.93);
+    color: var(--ink);
+  }
+  .sf-badge-dark {
+    background: rgba(17, 17, 28, 0.66);
+    color: #fff;
+  }
+  .sf-badge-new {
+    background: var(--accent);
+    color: var(--on-accent);
+    /* A thin highlight along the top inner edge — the difference between a
+       flat colour rectangle and something that reads as enamelled. */
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+  .sf-badges {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  /* Save / watchlist. A heart is the one storefront affordance nobody has to
+     be taught, and it is per-viewer only — nothing about it leaves the
+     browser. 32px, because it is a thumb target sitting next to a swipe. */
+  .sf-heart {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 6;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    border: 0;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ink-2);
+    box-shadow: var(--shadow-xs);
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-spring), color 0.2s var(--ease-standard);
+  }
+  .sf-heart:hover {
+    transform: scale(1.1);
+  }
+  .sf-heart:active {
+    transform: scale(0.86);
+  }
+  .sf-heart[data-on="true"] {
+    color: var(--bad);
+  }
+  /* The compact row's heart: smaller, and parked in the foot of the thumbnail
+     where it cannot land on the vehicle's name. */
+  .sf-heart-sm {
+    width: 26px;
+    height: 26px;
+  }
+  .sf-heart-slot {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+  }
+  .sf-heart-slot .sf-heart {
+    position: static;
+  }
+  .sf-heart-slot {
+    padding: 5px;
+  }
+
+  /* Sold stock stays browsable, so the veil is decoration: it must not
+     swallow the tap that opens the listing under it. */
+  .sf-sold-veil {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    background: rgba(17, 17, 28, 0.48);
+  }
+  .sf-sold-stamp {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #fff;
+    transform: rotate(-6deg);
+  }
+
+  /* Card body. 11px of padding, and the price row carries no label and no
+     rule above it — the number is unmistakable without either. */
+  .sf-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 11px 11px;
+  }
+  @media (min-width: 640px) {
+    .sf-body {
+      padding: 12px 13px 13px;
+    }
+  }
+
+  .sf-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 17px;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+
+  /* Specs as one mono line rather than a set of chips: chips wrap to a second
+     row on a narrow phone and cost more height than they earn. */
+  .sf-meta {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--ink-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Quick facts — mileage and registration, in their own small chips rather
+     than folded into the muted meta line above. Wraps rather than truncates:
+     these two are worth a second line before either gets clipped. */
+  .sf-qfacts {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 4px;
+  }
+  .sf-qf {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2.5px 7px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  /* Mileage always reads as the accent — a fact every buyer weighs, whatever
+     it says, so it never needs a warning tone the way registration does. */
+  .sf-qf-km {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+  .sf-qf[data-tone="ok"] {
+    background: var(--ok-soft);
+    color: var(--ok-ink);
+  }
+  .sf-qf[data-tone="warn"] {
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+  }
+  .sf-qf[data-tone="bad"] {
+    background: var(--bad-soft);
+    color: var(--bad-ink);
+  }
+
+  /* The one word a price on its own doesn't say: that it's an ask, not a
+     sticker. Grid cards only — the compact row already spends its three
+     lines on the facts that don't fit a card, and has none to spare on a
+     label the price's own size already implies. */
+  .sf-price-eyebrow {
+    display: block;
+    margin-bottom: 1px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* Accent, not ink. The one number on the card that is the whole reason
+     someone opened it gets the one colour on the page reserved for things
+     that matter — everywhere this isn't overridden inline (a sold price
+     turns `--ok` green, QuickView sets its own), which is exactly the two
+     "asking price" spots on a card and a row. */
+  .sf-price {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 21px;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--accent-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .sf-price-sub {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+  }
+
+  /* The round add-offer control. A labelled button costs a whole row; this
+     costs nothing and is the single action the card exists for. */
+  .sf-add {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    border: 0;
+    background: var(--accent);
+    color: var(--on-accent);
+    cursor: pointer;
+    box-shadow: 0 3px 10px -3px color-mix(in srgb, var(--accent) 65%, transparent);
+    transition: transform 0.16s var(--ease-spring), background 0.16s var(--ease-standard);
+  }
+  .sf-add:hover {
+    background: var(--accent-2);
+  }
+  .sf-add:active {
+    transform: scale(0.9);
+  }
+  .sf-add[data-has="true"] {
+    background: var(--surface);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1.5px var(--accent-line);
+  }
+
+  /* The strip that reports the viewer's own offers back to them. */
+  .sf-mine {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  /* ---- Compact row ----------------------------------------------------- */
+
+  /* The phone default. A 108px photo, three lines of text and the action, in
+     about 92px of height — five vehicles a screen instead of one and a half. */
+  /* Same material as `.sf-card` — floated on a tinted shadow, not boxed in a
+     rule — because this is the density most of the storefront's own traffic
+     actually sees (the field roles default here), and a premium catalogue
+     does not get to look plainer just because its rows are compact. */
+  .sf-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    overflow: hidden;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    background: var(--surface);
+    box-shadow:
+      0 1px 2px rgba(14, 17, 22, 0.04),
+      0 8px 18px -14px rgba(14, 17, 22, 0.26);
+    transition:
+      transform 0.18s var(--ease-out-quart),
+      box-shadow 0.18s var(--ease-out-quart),
+      border-color 0.18s var(--ease-out-quart);
+  }
+  @media (min-width: 640px) {
+    .sf-row {
+      grid-template-columns: 168px minmax(0, 1fr);
+      border-radius: var(--radius-lg);
+    }
+  }
+  /* A desk browsing on a wide screen isn't scanning forty vehicles a minute
+     the way a field officer on a phone is — there's room to let the
+     photograph breathe, so it gets more of the row here than the 640px step
+     gives it. The phone sizes above are untouched: that's the density this
+     whole file is written around, and it doesn't get to shrink just because
+     a wider screen wants a bigger picture. */
+  @media (min-width: 900px) {
+    .sf-row {
+      grid-template-columns: 216px minmax(0, 1fr);
+    }
+  }
+  @media (hover: hover) {
+    .sf-row:hover {
+      box-shadow:
+        0 2px 5px rgba(14, 17, 22, 0.05),
+        0 20px 34px -18px rgba(14, 17, 22, 0.3),
+        0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+    }
+  }
+  .sf-row:active {
+    transform: scale(0.995);
+  }
+  .sf-row-media {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .sf-row-media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* Same foot-of-photo wash as the grid card, scaled down — five of these a
+     screen should still read as photographs, not as flat crops. */
+  .sf-row-media::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 40%;
+    pointer-events: none;
+    background: linear-gradient(to top, rgba(14, 17, 22, 0.3), transparent);
+  }
+  /* Row-scoped sizes.
+     These four values lived as inline `style={{ fontSize }}` on ProductCard,
+     where no stylesheet could reach them. Moved here unchanged, so the desk
+     renders exactly as it did — and so 17-field-density.css can narrow them
+     on the phone, which it could not do while they were inline. */
+  .sf-row .sf-title {
+    font-size: 15.5px;
+  }
+  .sf-row .sf-row-make {
+    font-size: 8px;
+  }
+  .sf-row .sf-price {
+    font-size: 18px;
+  }
+  .sf-card-make {
+    font-size: 8.5px;
+  }
+  .sf-price-sold {
+    font-size: 18px;
+  }
+
+  .sf-row-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 8px 10px 8px 11px;
+  }
+  @media (min-width: 900px) {
+    .sf-row-body {
+      padding: 12px 18px 12px 16px;
+      gap: 4px;
+    }
+  }
+
+  /* ---- Bottom sheets --------------------------------------------------- */
+
+  /* Filters, offers and the listing itself all arrive from the bottom edge on
+     a phone — that is where the thumb already is, and a dialog dropped into
+     the middle of a tall screen is a desktop habit. Above `sm` they become
+     ordinary centred dialogs. */
+  .sf-sheet {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: 90dvh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-top: 1px solid var(--rule);
+    background: var(--surface);
+    box-shadow: var(--shadow-xl);
+    animation: sheetUp 0.28s var(--ease-out-quart);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  @media (min-width: 640px) {
+    .sf-sheet {
+      width: min(var(--sheet-w, 520px), 100%);
+      margin: 0 auto;
+      max-height: min(88vh, 860px);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--rule);
+      animation: scaleIn 0.2s var(--ease-out-quart);
+      padding-bottom: 0;
+    }
+  }
+
+  @keyframes sheetUp {
+    from {
+      transform: translateY(14%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* The grab handle. Purely a signal — the sheet is closed by the backdrop or
+     the close button — but without it a bottom sheet reads as a stuck panel. */
+  .sf-grip {
+    display: block;
+    width: 38px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 999px;
+    background: var(--rule-strong);
+    flex: 0 0 auto;
+  }
+  @media (min-width: 640px) {
+    .sf-grip {
+      display: none;
+    }
+  }
+
+  .sf-sheet-body {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ---- Listing view ---------------------------------------------------- */
+
+  .sf-qv {
+    --sheet-w: 1040px;
+  }
+  .sf-qv-body {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 900px) {
+    .sf-qv-body {
+      grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+      align-items: start;
+    }
+  }
+
+  .sf-stage {
+    position: relative;
+    aspect-ratio: 16 / 11;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  @media (min-width: 900px) {
+    .sf-stage {
+      aspect-ratio: 4 / 3;
+    }
+  }
+  .sf-stage img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .sf-thumb {
+    position: relative;
+    flex: 0 0 auto;
+    width: 58px;
+    height: 42px;
+    overflow: hidden;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background: var(--surface-2);
+    cursor: pointer;
+    opacity: 0.55;
+    transition: border-color 0.16s var(--ease-standard), opacity 0.16s var(--ease-standard);
+  }
+  .sf-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .sf-thumb[data-on="true"] {
+    border-color: var(--accent);
+    opacity: 1;
+  }
+  .sf-thumb:hover {
+    opacity: 1;
+  }
+
+  /* A single specification, as a chip. The cards use a plain mono line
+     instead — chips wrap, and a wrapped row costs a card its compactness —
+     but the listing view has the width to lay them out properly. */
+  .sf-spec {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  /* Same tone system as the `.sf-qf` chips on the card grid — a spec that
+     needs a buyer's attention (or, for mileage, just their attention) gets
+     colour; the rest stay neutral grey. */
+  .sf-spec[data-tone="accent"] {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+  .sf-spec[data-tone="ok"] {
+    background: var(--ok-soft);
+    color: var(--ok-ink);
+  }
+  .sf-spec[data-tone="warn"] {
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+  }
+  .sf-spec[data-tone="bad"] {
+    background: var(--bad-soft);
+    color: var(--bad-ink);
+  }
+
+  /* ---- My-offers drawer ------------------------------------------------ */
+
+  /* Everything the officer has out, across every vehicle. A side panel on a
+     desk, a bottom sheet on a phone — same reason as every other sheet here. */
+  .sf-drawer {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    max-height: 88dvh;
+    border-top: 1px solid var(--rule);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    background: var(--surface);
+    box-shadow: var(--shadow-xl);
+    animation: sheetUp 0.28s var(--ease-out-quart);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  @media (min-width: 640px) {
+    .sf-drawer {
+      inset: 0 0 0 auto;
+      width: min(440px, 100%);
+      max-height: none;
+      border-top: 0;
+      border-left: 1px solid var(--rule);
+      border-radius: 0;
+      animation: slideInRight 0.24s var(--ease-out-quart);
+      padding-bottom: 0;
+    }
+  }
+
+  /* ---- Sales officer picker --------------------------------------------- */
+
+  /* A grid of people, capped in height so a long roster scrolls rather than
+     pushing the customer field off the sheet. Two columns from `sm`, because
+     at that width one column leaves half the sheet empty. */
+  .sf-officers {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    max-height: 216px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
+  @media (min-width: 480px) {
+    .sf-officers {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .sf-officer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
+    text-align: left;
+    transition:
+      border-color 0.16s var(--ease-standard),
+      background 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard),
+      transform 0.14s var(--ease-spring);
+  }
+  .sf-officer:hover {
+    border-color: var(--accent-line);
+    color: var(--ink);
+  }
+  .sf-officer:active {
+    transform: scale(0.97);
+  }
+  .sf-officer[data-on="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  /* The initials tile. Flat accent-soft normally, solid accent once chosen —
+     the same two-state treatment the sidebar's icon tiles use, so "selected"
+     looks the same everywhere in the app. */
+  .sf-officer-face {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--ink-3);
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    transition:
+      background 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .sf-officer[data-on="true"] .sf-officer-face {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  /* ---- Offer rows ------------------------------------------------------ */
+
+  /* One customer's price. Used both by the officer reading their own offers
+     back and by the desk reading the whole book — same row, more columns. */
+  .sf-offer {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    width: 100%;
+    padding: 9px 10px;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    transition: border-color 0.16s var(--ease-standard), background 0.16s var(--ease-standard);
+  }
+  .sf-offer:hover {
+    border-color: var(--rule-strong);
+  }
+  .sf-offer[data-picked="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .sf-offer[data-top="true"] {
+    border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  }
+
+  /* The identity line management asked for: who the buyer is, who brought
+     them in, out of which territory, at what level. */
+  .sf-who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 6px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--ink-3);
+  }
+  .sf-level {
+    display: inline-flex;
+    align-items: center;
+    padding: 1.5px 5px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--surface-3);
+    color: var(--ink-2);
+  }
+  .sf-level[data-level="Sales Officer"] {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+  .sf-level[data-level="ARO"] {
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+  }
+  .sf-level[data-level="Engineer"] {
+    background: var(--ok-soft);
+    color: var(--ok-ink);
+  }
+
+  /* ---- Back to top ----------------------------------------------------- */
+
+  /* A long catalogue on a phone is a long way back. Sits above the shell's
+     bottom nav and only appears once there is something to come back from. */
+  .sf-totop {
+    position: fixed;
+    right: 14px;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface-alpha-strong);
+    color: var(--ink-2);
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+    animation: scaleIn 0.2s var(--ease-spring);
+  }
+  .sf-totop:active {
+    transform: scale(0.9);
+  }
+  @media (min-width: 1024px) {
+    .sf-totop {
+      right: 26px;
+      bottom: 26px;
+    }
+  }
+
+  /* ---- Empty state ------------------------------------------------------ */
+
+  .sf-empty {
+    display: grid;
+    place-items: center;
+    gap: 11px;
+    padding: 52px 22px;
+    text-align: center;
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--rule-strong);
+    background: var(--surface-alpha);
+  }
+
+  /* ---- Shell offset ----------------------------------------------------- */
+
+  /* The mobile shell keeps a bar pinned at the top of the viewport, so a page
+     sticking something of its own to `top: 0` parks it out of sight behind
+     that bar. The shell publishes its height; everything else defaults to 0. */
+  .shell-bar {
+    min-height: var(--shell-bar-h);
+  }
+  .shell-mobile {
+    --shell-top: var(--shell-bar-h);
+  }
+  /* Clearance for the fixed tab strip, safe area included. Replaces a
+     hardcoded pb-24 that ran 35px past the bar it was clearing. */
+  .shell-tabs-pad {
+    padding-bottom: calc(var(--shell-tabs-h) + env(safe-area-inset-bottom));
+  }
+}
+

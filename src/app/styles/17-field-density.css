@@ -1,0 +1,159 @@
+/* ===========================================================================
+   THE FIELD TYPE SCALE — one ramp for every screen on the officer's phone
+
+   The dashboard was already right. Captures, Off-road and the Marketplace were
+   each set independently, and each drifted a size or two larger — so moving
+   between the four tabs meant the type changed size under the officer's thumb
+   for no reason they could name.
+
+   Measured, before this file existed:
+
+                    dashboard    captures   off-road   marketplace
+     page title     (none)         24px       24px        25px
+     item title     13px         14.5px       15px      15.5px
+     figure         15px             —          —         21px
+     card height    ~78px         ~100px    238-393px    93-108px
+
+   The dashboard is the reference because it is the screen the officer opens
+   most and the one they said reads correctly. Everything here is pulled to it
+   or one step under it — never over.
+
+   WHY A SCALE AND NOT FOUR EDITS. The sizes above were arbitrary Tailwind
+   values (`text-[15px]`) scattered across three components, which is how they
+   drifted apart in the first place and how they would drift again. These six
+   custom properties are now the only sizes the field screens are allowed to
+   use, so the next card added to any of them inherits the density instead of
+   inventing one.
+
+   SCOPED TO `.shell-mobile`, WHICH IS THE POINT. That class is on the field
+   shell only (see AppShell — the shell is chosen by role, not by viewport), so
+   a Recovery Manager reading the same Marketplace at a desk is untouched. This
+   is the phone's density, not the product's.
+   ======================================================================== */
+
+@layer components {
+  .shell-mobile {
+    /* The page's own name. Two steps over an item title rather than four —
+       a heading on a 375px screen is competing with the work for the first
+       thumb-length of the page, and it never wins that competition. */
+    --f-title: 17px;
+    /* The sentence under it. */
+    --f-lede: 11.5px;
+    /* A card or row title. The dashboard's own size, unchanged, and the one
+       measurement everything else on this list is squared against. */
+    --f-item: 13px;
+    /* A number that carries the point of the card — a price, a countdown. */
+    --f-figure: 15px;
+    /* Registration numbers, dates, sub-lines. */
+    --f-meta: 10.5px;
+    /* Chips, eyebrows, pill counts. The floor: nothing on the field surface
+       is set smaller than this, because it is read outdoors. */
+    --f-micro: 9.5px;
+  }
+
+  /* ---- The shared header on Captures and Off-road ---- */
+  .fh-title {
+    font-family: var(--font-display);
+    font-size: var(--f-title);
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .fh-sub {
+    margin-top: 3px;
+    font-size: var(--f-lede);
+    line-height: 1.45;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  /* The eyebrow shrinks with everything else, and loses a little of its
+     tracking — letterspacing that reads as deliberate at 10.5px reads as a
+     gap at 9.5px. */
+  .shell-mobile .fh-eyebrow {
+    font-size: var(--f-micro);
+    letter-spacing: 0.13em;
+  }
+
+  /* ---- Item titles ----
+     One rule, three surfaces. `.f-item` replaced a 14.5px, a 15px and a 15.5px
+     that were all trying to be the same thing. */
+  .f-item {
+    font-family: var(--font-display);
+    font-size: var(--f-item);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+  }
+
+  /* ---- The Marketplace, on a phone ----
+     The storefront is the one field screen that is also a desk screen, so its
+     own stylesheet stays as it is and this narrows it only where the shell is
+     the phone's. */
+  /* `.sf-row` is in these selectors to out-specify the row-scoped sizes in
+     07-storefront.css, which are themselves two classes deep. */
+  .shell-mobile .sf-headline {
+    font-size: var(--f-title);
+    line-height: 1.12;
+  }
+  .shell-mobile .sf-title,
+  .shell-mobile .sf-row .sf-title {
+    font-size: var(--f-item);
+    line-height: 1.2;
+  }
+  .shell-mobile .sf-row .sf-row-make,
+  .shell-mobile .sf-card-make {
+    font-size: var(--f-micro);
+  }
+  /* 21px to 15px is the largest single cut in this file, and the asking price
+     survives it: it is the only figure on the row set in the accent, it sits
+     alone on its line, and at 15px/800 it is still the heaviest thing in the
+     card. Size was doing work that weight and colour already did. */
+  .shell-mobile .sf-price,
+  .shell-mobile .sf-row .sf-price,
+  .shell-mobile .sf-price-sold {
+    font-size: var(--f-figure);
+    letter-spacing: -0.02em;
+  }
+  .shell-mobile .sf-meta {
+    font-size: var(--f-meta);
+  }
+  .shell-mobile .sf-price-sub {
+    font-size: var(--f-micro);
+  }
+  /* Tighter rows follow from smaller type — leaving the old padding around
+     shorter text just moves the bulk from the words to the gaps. */
+  .shell-mobile .sf-row {
+    grid-template-columns: 92px minmax(0, 1fr);
+  }
+  .shell-mobile .sf-row-body {
+    padding: 7px 10px 7px 10px;
+    gap: 1px;
+  }
+
+  /* ---- Supporting lines inside a field card ----
+     The line under a title (a reason, a status sentence) and the mono line
+     carrying a registration. Named rather than sized inline for the same
+     reason `.f-item` is. */
+  .f-line {
+    font-size: var(--f-lede);
+    line-height: 1.4;
+    color: var(--ink-2);
+  }
+  .f-meta {
+    font-family: var(--font-mono);
+    font-size: var(--f-meta);
+    line-height: 1.35;
+    color: var(--ink-3);
+  }
+
+  /* ---- Buttons on the field surface ----
+     A full-width action inside a card does not need to be as tall as one that
+     ends a form. */
+  .shell-mobile .btn-block {
+    min-height: 34px;
+    font-size: 12px;
+  }
+}

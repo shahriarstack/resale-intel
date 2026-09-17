@@ -25,6 +25,21 @@ export const EVENT_META: Record<EventType, { label: string; tone: Tone }> = {
   SENT_BACK: { label: "Sent back", tone: "bad" },
   LOCKED: { label: "Record locked", tone: "warn" },
   UNLOCKED: { label: "Record unlocked", tone: "neutral" },
-  BID_PLACED: { label: "Bid placed", tone: "accent" },
+  BID_PLACED: { label: "Customer offer submitted", tone: "accent" },
+  BID_REVISED: { label: "Customer offer revised", tone: "neutral" },
+  BID_WITHDRAWN: { label: "Customer offer withdrawn", tone: "warn" },
   SALE_AWARDED: { label: "Sale awarded", tone: "ok" },
+  REPAIR_PROGRESS: { label: "Repair progress", tone: "accent" },
+  SOLD_AS_IS: { label: "Marked for as-is sale", tone: "warn" },
+  HANDOVER_SUBMITTED: { label: "Refurbishment photos filed", tone: "ok" },
+  // The enum values still say VALIDITY_SET / _RENEWED because they are stored
+  // database values and renaming them would orphan every row already written.
+  // What these events actually record is a costing status update, so that is
+  // what they are labelled.
+  REGISTRATION_VALIDITY_SET: { label: "Registration costing set", tone: "accent" },
+  REGISTRATION_VALIDITY_RENEWED: { label: "Registration status updated", tone: "neutral" },
+  // Neutral, not warn. Nothing went wrong — the rule did what it says, on
+  // schedule, and colouring housekeeping as a warning teaches people to
+  // discount the colour that means something actually needs attention.
+  PHOTOS_PURGED: { label: "Photographs removed after sale", tone: "neutral" },
 };

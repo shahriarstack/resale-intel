@@ -13,6 +13,8 @@ export const PATCH = withGuard(
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.code !== undefined ? { code: data.code?.trim() || null } : {}),
+        // "" clears the assignment back to unassigned; undefined leaves it.
+        ...(data.part !== undefined ? { part: data.part || null } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       },
     });

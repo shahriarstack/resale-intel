@@ -89,7 +89,7 @@ export function ActionModal({
         </div>
 
         {error && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-bad">
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-bad-ink">
             <AlertCircle size={15} className="mt-0.5 shrink-0" />
             <span className="text-xs font-medium">{error}</span>
           </div>

@@ -20,6 +20,9 @@ import {
   Rows3,
   Rows4,
   SearchX,
+  MapPin,
+  CalendarRange,
+  X,
 } from "lucide-react";
 import { Chip } from "@/components/ui/Chip";
 import { SearchBar } from "@/components/ui/SearchBar";
@@ -29,7 +32,8 @@ import { LETTER_META } from "@/lib/status";
 import { shortDate, taka, takaCompact } from "@/lib/format";
 import { gradeSla, slaRank, summarise, type SlaLevel } from "@/lib/sla";
 import { ActionModal, type PendingAction } from "@/components/vehicle/ActionModal";
-import { vehicleTitle } from "@/lib/vehicle";
+import { accountTitle, vehicleTitle } from "@/lib/vehicle";
+import { AccountTitle } from "@/components/ui/AccountTitle";
 import { DetailPane } from "@/components/workspace/DetailPane";
 import { BulkBar } from "@/components/workspace/BulkBar";
 import { useSavedViews } from "@/components/workspace/useSavedViews";
@@ -52,6 +56,25 @@ import {
 // Re-exported so the dashboard's existing imports keep resolving unchanged.
 export type DeskVehicle = WorkspaceVehicle;
 export type { QuickAction };
+
+/** Files with no territory set still belong to somebody. */
+const UNASSIGNED_TERRITORY = "Unassigned";
+
+/**
+ * A YYYY-MM-DD string as a local day boundary.
+ *
+ * Built from the parts rather than `new Date(string)`, which parses a bare
+ * date as UTC midnight and would move the boundary by the timezone offset —
+ * six hours in Dhaka, enough to silently include or drop a day's captures.
+ */
+function dayBound(v: string, endOfDay: boolean): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  return endOfDay
+    ? new Date(y, mo - 1, d, 23, 59, 59, 999)
+    : new Date(y, mo - 1, d, 0, 0, 0, 0);
+}
 
 function matchSearch(v: WorkspaceVehicle, q: string): boolean {
   const s = q.toLowerCase();
@@ -161,6 +184,24 @@ export function DeskInbox({
   );
 
   const summary = useMemo(() => summarise(graded.map((g) => g.sla)), [graded]);
+
+  /**
+   * Territories present on this desk, with counts.
+   *
+   * Built from the queue itself rather than the master list, so a desk only
+   * ever offers territories it actually holds work for — a filter that can
+   * return nothing is a filter nobody trusts.
+   */
+  const territoryOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const v of vehicles) {
+      const key = v.territory?.name ?? UNASSIGNED_TERRITORY;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [vehicles]);
   const valueAtDesk = useMemo(
     () => vehicles.reduce((s, v) => s + (v.totalCost ?? 0), 0),
     [vehicles],
@@ -171,6 +212,21 @@ export function DeskInbox({
     if (filter.search.trim()) list = list.filter((g) => matchSearch(g.v, filter.search));
     if (filter.sla.length) list = list.filter((g) => filter.sla.includes(g.sla.level));
     if (filter.letters.length) list = list.filter((g) => filter.letters.includes(g.v.letterStage));
+    if (filter.territories.length) {
+      list = list.filter((g) =>
+        filter.territories.includes(g.v.territory?.name ?? UNASSIGNED_TERRITORY),
+      );
+    }
+    // Capture window. Both ends inclusive whole days in local time — a range
+    // of 1–31 July must contain everything captured on the 31st.
+    if (filter.from) {
+      const start = dayBound(filter.from, false);
+      if (start) list = list.filter((g) => new Date(g.v.createdAt) >= start);
+    }
+    if (filter.to) {
+      const end = dayBound(filter.to, true);
+      if (end) list = list.filter((g) => new Date(g.v.createdAt) <= end);
+    }
 
     const dir = filter.sortDir === "asc" ? 1 : -1;
     return [...list].sort((a, b) => {
@@ -275,6 +331,24 @@ export function DeskInbox({
     [graded],
   );
 
+  const toggleTerritory = (name: string) => {
+    setFilter((f) => ({
+      ...f,
+      territories: f.territories.includes(name)
+        ? f.territories.filter((t) => t !== name)
+        : [...f.territories, name],
+    }));
+    setActiveView("");
+  };
+
+  const setWindow = (from: string, to: string) => {
+    setFilter((f) => ({ ...f, from, to }));
+    setActiveView("");
+  };
+
+  const narrowed =
+    filter.territories.length > 0 || Boolean(filter.from) || Boolean(filter.to);
+
   const toggleSlaFilter = (levels: SlaLevel[]) => {
     setFilter((f) => {
       const on = levels.every((l) => f.sla.includes(l)) && f.sla.length === levels.length;
@@ -296,7 +370,7 @@ export function DeskInbox({
 
 
   return (
-    <div className="mx-auto max-w-[1580px] px-5 py-6 lg:px-7">
+    <div className="mx-auto w-full max-w-[1580px] px-5 py-6 lg:px-7">
       {/* ---- Header ---- */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1" style={{ minWidth: 280 }}>
@@ -334,7 +408,7 @@ export function DeskInbox({
       </div>
 
       {/* ---- Metric rail. Each tile is also the filter for what it counts. ---- */}
-      <div className="mt-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <div className="stagger mt-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         <StatTile
           icon={<Inbox size={17} />}
           tint="accent"
@@ -416,7 +490,11 @@ export function DeskInbox({
           })}
 
           {/* Offer to keep the current filter only when it is actually new. */}
-          {dirty && (filter.search.trim() || filter.sla.length || filter.letters.length) && (
+          {dirty &&
+            (filter.search.trim() ||
+              filter.sla.length ||
+              filter.letters.length ||
+              narrowed) && (
             naming ? (
               <span className="inline-flex items-center gap-1.5">
                 <input
@@ -477,6 +555,76 @@ export function DeskInbox({
         </div>
       )}
 
+      {/* ---- Territory & capture window ----
+          A second row, because these narrow WHICH files are on the desk while
+          the row above narrows how they are shown. Both are client-side: every
+          row is already here, so filtering is instant and costs no round trip. */}
+      {vehicles.length > 0 && (
+        <div className="deskfilter mt-2.5">
+          {territoryOptions.length > 1 && (
+            <div className="deskfilter-group">
+              <span className="deskfilter-label">
+                <MapPin size={11} />
+                Territory
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {territoryOptions.map((t) => (
+                  <button
+                    key={t.name}
+                    className="terr-chip"
+                    data-on={filter.territories.includes(t.name)}
+                    onClick={() => toggleTerritory(t.name)}
+                    aria-pressed={filter.territories.includes(t.name)}
+                  >
+                    {t.name}
+                    <span className="terr-count">{t.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="deskfilter-group">
+            <span className="deskfilter-label">
+              <CalendarRange size={11} />
+              Captured
+            </span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                className="field h-8 w-[138px] py-0 text-xs"
+                aria-label="Captured from"
+                value={filter.from}
+                max={filter.to || undefined}
+                onChange={(e) => setWindow(e.target.value, filter.to)}
+              />
+              <span className="text-[11px] text-ink-3">to</span>
+              <input
+                type="date"
+                className="field h-8 w-[138px] py-0 text-xs"
+                aria-label="Captured to"
+                value={filter.to}
+                min={filter.from || undefined}
+                onChange={(e) => setWindow(filter.from, e.target.value)}
+              />
+            </div>
+          </div>
+
+          {narrowed && (
+            <button
+              className="btn btn-ghost btn-sm shrink-0"
+              onClick={() => {
+                setFilter((f) => ({ ...f, territories: [], from: "", to: "" }));
+                setActiveView("");
+              }}
+            >
+              <X size={12} />
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ---- Workspace ---- */}
       <div className="ws mt-4" data-detail={openVehicle ? "true" : "false"}>
         <div className="min-w-0">
@@ -490,7 +638,7 @@ export function DeskInbox({
               }}
             />
           ) : (
-            <div className="card overflow-hidden aura-glass transition-all duration-300">
+            <div className="card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="dtable">
                   <thead>
@@ -510,14 +658,21 @@ export function DeskInbox({
                           }
                         />
                       </th>
-                      <th className="sortable group" onClick={() => toggleSort("vehicle")}>
-                        Vehicle <SortIcon column="vehicle" sortKey={filter.sortKey} sortDir={filter.sortDir} />
+                      {/* THE LEADING COLUMN IS THE ACCOUNT.
+                          It used to be the vehicle, with the customer three
+                          columns to its right — so a desk scanning its inbox
+                          read a list of load classes and had to track sideways
+                          to find out whose file each row was. The columns are
+                          the same three; they have swapped ends, and both
+                          still sort on the key they always did. */}
+                      <th className="sortable group" onClick={() => toggleSort("customer")}>
+                        Customer <SortIcon column="customer" sortKey={filter.sortKey} sortDir={filter.sortDir} />
                       </th>
                       <th className="sortable group" onClick={() => toggleSort("reg")}>
                         Reg no <SortIcon column="reg" sortKey={filter.sortKey} sortDir={filter.sortDir} />
                       </th>
-                      <th className="sortable group" onClick={() => toggleSort("customer")}>
-                        Customer <SortIcon column="customer" sortKey={filter.sortKey} sortDir={filter.sortDir} />
+                      <th className="sortable group" onClick={() => toggleSort("vehicle")}>
+                        Vehicle <SortIcon column="vehicle" sortKey={filter.sortKey} sortDir={filter.sortDir} />
                       </th>
                       {columns.includes("letter") && <th>Letter</th>}
                       {columns.includes("engineer") && <th>Engineer</th>}
@@ -546,7 +701,7 @@ export function DeskInbox({
                         data-cursor={cursor === i}
                         style={{
                           ["--sla-color" as string]: sla.color ?? "transparent",
-                          animation: `fadeIn 0.15s ease ${Math.min(i, 12) * 0.02}s both`,
+                          animation: `fadeIn 0.15s var(--ease-standard) ${Math.min(i, 12) * 0.02}s both`,
                           cursor: "pointer",
                         }}
                         onClick={() => {
@@ -560,18 +715,18 @@ export function DeskInbox({
                         >
                           <input
                             type="checkbox"
-                            aria-label={`Select ${vehicleTitle(v)}`}
+                            aria-label={`Select ${accountTitle(v)}`}
                             checked={picked.includes(v.id)}
                             onChange={() => togglePick(v.id)}
                           />
                         </td>
                         <td className="strong" style={rowPad}>
-                          {vehicleTitle(v)}
+                          <AccountTitle record={v} as="div" />
                         </td>
                         <td className="font-mono text-xs" style={rowPad}>
                           {v.registrationNo}
                         </td>
-                        <td style={rowPad}>{v.customerName}</td>
+                        <td style={rowPad}>{vehicleTitle(v)}</td>
                         {columns.includes("letter") && (
                           <td style={rowPad}>
                             <Chip tone={LETTER_META[v.letterStage].tone}>
@@ -597,7 +752,7 @@ export function DeskInbox({
                           <span
                             className="flex items-center gap-1.5 whitespace-nowrap"
                             style={{ ["--sla-color" as string]: sla.color ?? "var(--rule-strong)" }}
-                            title={`${shortDate(v.createdAt)} — ${sla.label}`}
+                            title={`${shortDate(v.createdAt)} · ${sla.label}`}
                           >
                             <span className="sla-dot" />
                             <span
@@ -728,7 +883,7 @@ export function DeskInbox({
 function EmptyDesk() {
   return (
     <div
-      className="card grid place-items-center gap-3 px-6 py-16 text-center aura-glass aura-float"
+      className="card grid place-items-center gap-3 px-6 py-16 text-center"
       style={{ animation: "fadeIn 0.28s var(--ease-standard)" }}
     >
       <div className="grid h-14 w-14 place-items-center rounded-full bg-ok-soft">
@@ -745,7 +900,7 @@ function EmptyDesk() {
 function NoMatches({ onClear }: { onClear: () => void }) {
   return (
     <div
-      className="card grid place-items-center gap-3 px-6 py-14 text-center aura-glass aura-float"
+      className="card grid place-items-center gap-3 px-6 py-14 text-center"
       style={{ animation: "fadeIn 0.24s var(--ease-standard)" }}
     >
       <div className="grid h-12 w-12 place-items-center rounded-full bg-surface-3">

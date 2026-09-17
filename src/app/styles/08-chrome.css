@@ -1,0 +1,1366 @@
+/* ==========================================================================
+   The side panel
+   --------------------------------------------------------------------------
+   Three modes, because a desk uses this differently at different moments:
+
+     wide  — pinned open at 264px. Reading the app.
+     rail  — pinned at 68px, icons only. Working inside one page all day.
+     auto  — a 64px rail that OPENS OVER the page on hover and closes again
+             when the pointer leaves. Nothing reflows, so the page you are
+             reading does not jump sideways when you glance at the nav.
+
+   `auto` is the interesting one, and it is deliberately CSS-only: hover and
+   :has(:focus-visible) drive the width, so there is no pointer listener, no
+   timer and no state that can get stuck open, while tabbing into the nav
+   opens it exactly as a mouse does.
+
+   :focus-visible, NOT :focus-within — a mouse click on the mode button leaves
+   focus inside the panel, and :focus-within would then hold it open until the
+   user clicked somewhere else. The browser already distinguishes "focused
+   because tabbed" from "focused because clicked"; this defers to it.
+
+   Two selector groups run through everything below, because "is this panel
+   showing labels" is not the same question as "which mode is it in":
+
+     EXPANDED = wide, or auto while hovered / keyboard-focused
+     SHUT     = rail, or auto while neither
+
+   They are written out longhand with :is() rather than hung off a data
+   attribute, because a data attribute would have to be maintained by a
+   pointer handler — which is the thing this design exists to avoid.
+   ========================================================================== */
+
+@layer components {
+  /* ---- The panel ----
+     One flat, deep navy — not paper, not a gradient, and deliberately not the
+     accent. The rail used to be the same white as the page beside it, which
+     meant the only thing dividing the application's furniture from its content
+     was a hairline. A saturated panel makes that boundary structural: the
+     chrome is one object and the work is another.
+
+     Flat on purpose. A gradient here implied a light source the rest of the
+     chrome does not have, and at 264px wide it read as a sheen rather than as
+     depth. One colour states the same thing and never argues with the tiles
+     across from it. */
+  .side {
+    /* Named, because the active glyph below is cut out of this exact colour
+       and the two must never drift apart. */
+    --side-ground: #382b8c;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    height: 100dvh;
+    flex-direction: column;
+    flex-shrink: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    width: var(--side-w);
+    color: rgba(255, 255, 255, 0.78);
+    background-color: var(--side-ground);
+    background-image: none;
+    transition: width 0.26s var(--ease-out-quart);
+  }
+
+  /* The dot field.
+     Densest behind the brand mark and gone before the first nav label — the
+     texture belongs to the panel's head, where there is nothing to read, and
+     has no business behind a list of words. Fading it out rather than tiling
+     the whole rail is the difference between a surface with a grain and a
+     wallpaper.
+
+     This reuses the element the head bloom used to occupy, so the markup is
+     unchanged. */
+  .side-glow {
+    display: block;
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 260px;
+    pointer-events: none;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.55) 0.9px, transparent 1.3px);
+    background-size: 15px 15px;
+    opacity: 0.2;
+    mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.45) 42%, transparent 82%);
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.45) 42%, transparent 82%);
+  }
+  .side[data-mode="wide"] {
+    --side-w: 264px;
+  }
+  .side[data-mode="rail"] {
+    --side-w: 68px;
+  }
+
+  /* Auto-hide: the panel leaves the flow and floats, so opening it costs the
+     page nothing. The gutter it leaves behind is set on the layout below. */
+  .side[data-mode="auto"] {
+    --side-w: 64px;
+    position: fixed;
+    inset: 0 auto 0 0;
+    border-right-color: transparent;
+  }
+  .side[data-mode="auto"]:hover,
+  .side[data-mode="auto"]:has(:focus-visible) {
+    --side-w: 268px;
+    border-right-color: var(--rule);
+    box-shadow: var(--shadow-xl);
+  }
+
+  /* No hover to lean on — a touch laptop or a tablet. Auto-hide degrades to a
+     plain rail rather than hiding half the controls behind a gesture the
+     device cannot make. */
+  @media (hover: none) {
+    .side[data-mode="auto"] {
+      --side-w: 68px;
+    }
+  }
+
+  /* A hairline of brand colour down the closing edge. While the panel is shut
+     this is the only thing marking where it lives, which is exactly the hint
+     that edge needs — and it gets out of the way the moment it opens. */
+  .side::after {
+    content: "";
+    position: absolute;
+    inset: 0 -1px 0 auto;
+    width: 2px;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      color-mix(in srgb, var(--accent) 55%, transparent) 18%,
+      color-mix(in srgb, var(--azure) 45%, transparent) 62%,
+      transparent
+    );
+    transition: opacity 0.26s var(--ease-standard);
+  }
+  .side[data-mode="auto"]::after {
+    opacity: 1;
+  }
+  .side[data-mode="auto"]:hover::after,
+  .side[data-mode="auto"]:has(:focus-visible)::after {
+    opacity: 0;
+  }
+
+  .side-head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 68px;
+    padding: 0 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  }
+  /* SHUT: the head has room for the badge or the control, not both side by
+     side, so they stack. */
+  :is(.side[data-mode="rail"], .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)))
+    .side-head {
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    padding: 12px 0 10px;
+  }
+
+  /* ---- What appears only when the panel is open ------------------------- */
+
+  /* Fades AND slides, so a label appears to come out from behind its icon
+     rather than blinking into place beside it. */
+  .side-label {
+    min-width: 0;
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.18s var(--ease-standard) 0.07s,
+      transform 0.24s var(--ease-out-quart) 0.07s;
+  }
+  :is(.side[data-mode="rail"], .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)))
+    .side-label {
+    /* Out of the flow entirely at rail width — a label that is merely
+       invisible still forces its row wider than the icon. */
+    position: absolute;
+    opacity: 0;
+    transform: translateX(-6px);
+    pointer-events: none;
+    transition-delay: 0s;
+  }
+
+  /* The compact badge is the head's stand-in while the panel is shut. Both
+     marks stay in the DOM and CSS chooses — a JS branch on a mode flag cannot
+     answer a question whose real input is `:hover`. */
+  .side-badge {
+    display: none;
+  }
+  :is(.side[data-mode="rail"], .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)))
+    .side-badge {
+    display: block;
+  }
+
+  /* Scoped to .side so it outranks the `display` a shut-only control sets for
+     itself — .side-signout is also a single class, and source order would
+     otherwise hand it the win and show two sign-out buttons at once. */
+  .side .side-shut-only {
+    display: none;
+  }
+  :is(.side[data-mode="rail"], .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)))
+    .side-shut-only {
+    display: grid;
+  }
+  :is(.side[data-mode="rail"], .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)))
+    .side-open-only {
+    display: none;
+  }
+
+  /* The panel's borrowed type.
+     These classes are written for paper and appear inside the rail anyway —
+     the brand's role line, the account tile's name and staff id, the palette
+     hint. Re-pointed here rather than at the components, because the same
+     components are used on light surfaces elsewhere and only their appearance
+     INSIDE this panel is wrong. */
+  .side .text-accent {
+    color: color-mix(in srgb, var(--accent-2) 42%, #fff);
+  }
+  .side .text-ink {
+    color: #fff;
+  }
+  .side .text-ink-2 {
+    color: rgba(255, 255, 255, 0.72);
+  }
+  .side .text-ink-3 {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .side .side-signout,
+  .side .side-mode {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  /* ---- Nav -------------------------------------------------------------- */
+
+  .side-nav {
+    position: relative;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 10px 10px 6px;
+    /* No track. The list still scrolls when a role has more entries than fit,
+       but a scrollbar drawn down a 264px panel of flat colour is a seam
+       through the one surface in the product that should read as solid. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .side-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .side-group + .side-group {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+  }
+  .side-group-label {
+    display: block;
+    padding: 0 10px 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: rgba(255, 255, 255, 0.42);
+    white-space: nowrap;
+    transition: opacity 0.18s var(--ease-standard);
+  }
+  /* SHUT: the heading collapses into the divider above it. The rule already
+     says "new band"; a truncated word says nothing. */
+  :is(.side[data-mode="rail"], .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)))
+    .side-group-label {
+    height: 0;
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  .side-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 42px;
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.72);
+    white-space: nowrap;
+    transition:
+      background-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .side-item + .side-item {
+    margin-top: 2px;
+  }
+  .side-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+  }
+  .side-item[data-active="true"] {
+    color: #fff;
+    background: linear-gradient(
+      95deg,
+      rgba(255, 255, 255, 0.14),
+      rgba(255, 255, 255, 0.05) 70%,
+      transparent
+    );
+  }
+
+  /* The marker on the current page. One per item, scaled in place, rather
+     than a single shared element that measures and travels — a measured
+     indicator has to re-read the DOM on every route change, resize and font
+     load, and gets it wrong at least once each time. This cannot drift. */
+  .side-item::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 20px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent-2);
+    transform: translateY(-50%) scaleY(0);
+    opacity: 0;
+    transition:
+      transform 0.3s var(--ease-spring),
+      opacity 0.2s var(--ease-standard);
+  }
+  .side-item[data-active="true"]::before {
+    transform: translateY(-50%) scaleY(1);
+    opacity: 1;
+  }
+
+  /* The icon sits in a tile. Quiet plate when inactive; the one saturated
+     object in the panel when active, which is what makes the current page
+     findable at a glance from the other side of a desk. */
+  .side-glyph {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+    transition:
+      background 0.2s var(--ease-standard),
+      color 0.2s var(--ease-standard),
+      box-shadow 0.2s var(--ease-standard),
+      transform 0.2s var(--ease-spring);
+  }
+  .side-item:hover .side-glyph {
+    transform: translateY(-1px);
+  }
+  .side-item:active .side-glyph {
+    transform: scale(0.92);
+  }
+  /* Inverted against the panel. The old accent-gradient plate was the one
+     saturated object in a white rail; on a dark ground it sinks into it, and
+     the current page stops being findable from across a desk — which is the
+     entire job of this marker. White is the only thing that outranks a navy
+     this deep, and the glyph is cut out of the panel's own colour so the tile
+     reads as a hole in the rail rather than a sticker on it. */
+  .side-item[data-active="true"] .side-glyph {
+    background: #fff;
+    color: var(--side-ground);
+    box-shadow:
+      0 3px 10px -3px rgba(0, 0, 0, 0.45),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  /* ---- Rail labels ------------------------------------------------------ */
+
+  /* While the panel is shut the labels are carried by the `title` attribute
+     rather than by a styled tooltip of our own.
+     
+     That is not laziness, it is the only thing that works here. A floating
+     label has to sit outside the 68px rail, and .side-nav is a scroll
+     container — which clips every absolutely-positioned descendant of the
+     items inside it, whatever their containing block. Escaping it needs
+     either JS to place a fixed element or CSS anchor positioning, and the nav
+     must keep its scroller for short viewports. So: the native tooltip, which
+     is never clipped and always correct.
+
+     The icon tiles carry the real weight in this mode anyway — an active tile
+     is unmistakable at a glance, which is what a rail is for. */
+
+  /* ---- Foot ------------------------------------------------------------- */
+
+  .side-foot {
+    position: relative;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    padding: 10px;
+  }
+
+  /* The account tile. One object, rather than an avatar, two lines of text
+     and a button scattered across a strip — and it collapses to just the
+     avatar without anything having to be hidden by hand. */
+  .side-user {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px;
+    border-radius: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    background: rgba(255, 255, 255, 0.06);
+    transition: border-color 0.18s var(--ease-standard);
+  }
+  .side-user:hover {
+    border-color: rgba(255, 255, 255, 0.24);
+  }
+  :is(.side[data-mode="rail"], .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)))
+    .side-user {
+    justify-content: center;
+    padding: 6px;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .side-signout {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    color: var(--ink-3);
+    transition:
+      background 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .side-signout:hover {
+    background: color-mix(in srgb, var(--bad) 34%, transparent);
+    color: #fff;
+  }
+
+  /* The keyboard hint. Discoverability for the command palette, in the one
+     place someone looks when they are hunting for something. */
+  .side-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 8px;
+    border-radius: 9px;
+    border: 1px dashed var(--rule-strong);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    white-space: nowrap;
+    transition:
+      border-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .side-hint:hover {
+    border-color: var(--accent-line);
+    color: var(--accent-ink);
+  }
+  :is(.side[data-mode="rail"], .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)))
+    .side-hint {
+    display: none;
+  }
+
+  /* ---- Mode control ----------------------------------------------------- */
+
+  .side-mode {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    color: var(--ink-3);
+    transition:
+      background 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard),
+      transform 0.24s var(--ease-spring);
+  }
+  .side-mode:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+  .side-mode:active {
+    transform: scale(0.9);
+  }
+  /* Auto-hide is the one mode with no visual tell once the panel is open, so
+     its control stays lit to say which mode you are in. */
+  .side[data-mode="auto"] .side-mode {
+    color: color-mix(in srgb, var(--accent-2) 40%, #fff);
+  }
+
+  /* ---- Layout ----------------------------------------------------------- */
+
+  /* The gutter an auto-hiding panel leaves behind. Set on the flex parent, so
+     the main column starts clear of the shut rail without needing to know
+     anything about it. */
+  .shell-desk[data-auto="true"] {
+    padding-left: 64px;
+  }
+  @media (hover: none) {
+    .shell-desk[data-auto="true"] {
+      padding-left: 68px;
+    }
+  }
+
+  /* ========================================================================
+     AT REST, THE RAIL IS A SUGGESTION
+
+     Auto-hide's whole promise is that the nav gets out of the way — and a
+     full-height slab of saturated navy sitting at the edge of every screen was
+     not out of the way. It was the loudest object in the product, permanently,
+     for a panel nobody was looking at.
+
+     So the shut auto rail DISSOLVES. The navy drops to a breath of itself and
+     fades downward into the page; the dot field goes; the tiles lose their
+     plates; the ink flips from white-on-navy to ink-on-paper. On approach the
+     panel develops back into the solid object it always was, over a third of a
+     second. Nothing is hidden and nothing moves — it is the same panel at a
+     different weight.
+
+     THE THESIS, and the reason this is a redesign rather than an opacity
+     value: at rest the rail shows you only WHERE YOU ARE, not everywhere you
+     could go. The current page keeps a real tile and the accent tick at the
+     screen's edge; every other glyph recedes to a stroke of ink. A shut nav's
+     job is orientation. Navigation is what opening it is for.
+
+     That holds because of something the mode's own mechanics guarantee: this
+     state is ONLY ever on screen while the pointer is away and nothing in it
+     is focused, since either opens the panel. The resting rail is a display,
+     never an interface — so it owes legibility at a glance and nothing else.
+
+     Scoped three ways, and each exclusion is load-bearing:
+
+       (hover: hover)            a touch laptop degrades auto to a plain rail
+                                 that never opens, so it must stay solid — a
+                                 ghost you cannot summon is a broken panel
+       :not(:hover/:focus)       the open panel is untouched
+       prefers-contrast: more    a reader who has asked for contrast gets the
+                                 slab, and should
+     ====================================================================== */
+  @media (hover: hover) {
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) {
+      background-color: transparent;
+      color: var(--ink-3);
+      border-right-color: transparent;
+      box-shadow: none;
+    }
+    /* The navy does not vanish, it thins. Same hue, a few per cent of it, gone
+       before the foot — so the column reads as a shadow of the panel rather
+       than as a different panel.
+
+       On its own pseudo-element rather than as the panel's background-image,
+       because a gradient cannot be cross-faded against the `none` the open
+       panel carries: it would snap out while the navy was still arriving.
+       Opacity on a separate layer cross-fades cleanly, and the pseudo is the
+       panel's first child so every positioned section paints over it. */
+    .side::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background-image: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--side-ground) 9%, transparent) 0%,
+        color-mix(in srgb, var(--side-ground) 4%, transparent) 40%,
+        transparent 88%
+      );
+      transition: opacity 0.34s var(--ease-out-quart);
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible))::before {
+      opacity: 1;
+    }
+
+    /* The ground is leaving, so everything drawn FOR that ground leaves with
+       it. Ink that was white-on-navy becomes ink-on-paper. */
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-mode,
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-signout {
+      color: var(--ink-3);
+    }
+
+    /* The grain belonged to a surface. There is no surface. */
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-glow {
+      opacity: 0;
+    }
+
+    /* Two hairlines that only ever read against navy. The head and foot rules
+       go entirely — at this weight the panel does not need internal
+       architecture — and the band divider survives as the faintest ink,
+       because the grouping is orientation and orientation is what this state
+       is for. */
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-head,
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-foot {
+      border-color: transparent;
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible))
+      .side-group
+      + .side-group {
+      border-top-color: color-mix(in srgb, var(--ink-3) 22%, transparent);
+    }
+
+    /* Inactive glyphs lose their plates and become the icon alone. Eleven
+       tinted tiles down an edge is eleven objects; eleven strokes is one
+       texture. --ink-3 on paper clears 3:1, the bar for a non-text control,
+       and every one still carries its native tooltip. */
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-glyph {
+      background: transparent;
+      color: var(--ink-3);
+      box-shadow: none;
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-item {
+      color: var(--ink-3);
+    }
+
+    /* WHERE YOU ARE. The two saturated things left in the resting rail, and
+       the reason it is still worth a glance: a soft accent tile under the
+       current page's glyph, and the tick at the very edge of the screen. The
+       white-on-navy cut-out is wrong here — it was built to outrank a deep
+       ground that is no longer present — so the active tile inverts with
+       everything else. */
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible))
+      .side-item[data-active="true"] {
+      background: transparent;
+      color: var(--accent-ink);
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible))
+      .side-item[data-active="true"]
+      .side-glyph {
+      background: var(--accent-soft);
+      color: var(--accent);
+      box-shadow: none;
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible))
+      .side-item[data-active="true"]::before {
+      background: var(--accent);
+    }
+
+    /* The seam. With the slab gone this is the only crisp line on the edge of
+       the screen, so it is drawn finer and dimmer — a hardware seam rather
+       than a highlight. It is what keeps the rail an object instead of a
+       column of floating icons. */
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible))::after {
+      width: 1px;
+      opacity: 0.55;
+    }
+
+    /* The panel develops rather than switches. Slightly longer than the width
+       change it accompanies, so the colour is still arriving as the width
+       settles — which is what makes it read as one material thickening and not
+       as two properties animating side by side. */
+    .side {
+      transition:
+        width 0.26s var(--ease-out-quart),
+        background-color 0.34s var(--ease-out-quart),
+        color 0.34s var(--ease-out-quart),
+        border-right-color 0.26s var(--ease-standard);
+    }
+    .side-head,
+    .side-foot,
+    .side-group + .side-group,
+    .side-item,
+    .side-mode,
+    .side-signout {
+      transition:
+        color 0.3s var(--ease-out-quart),
+        border-color 0.3s var(--ease-out-quart),
+        background-color 0.3s var(--ease-out-quart);
+    }
+  }
+
+  /* A reader who has asked the system for more contrast gets the slab back.
+     The dissolve is a luxury; legibility is not. */
+  @media (hover: hover) and (prefers-contrast: more) {
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) {
+      background-color: var(--side-ground);
+      color: rgba(255, 255, 255, 0.78);
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible))::before {
+      opacity: 0;
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-glyph {
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.8);
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible))
+      .side-item[data-active="true"]
+      .side-glyph {
+      background: #fff;
+      color: var(--side-ground);
+    }
+    .side[data-mode="auto"]:not(:hover):not(:has(:focus-visible)) .side-glow {
+      opacity: 0.2;
+    }
+  }
+
+  /* Motion is decoration here; the panel must still work without it. */
+  @media (prefers-reduced-motion: reduce) {
+    .side,
+    .side::before,
+    .side-label,
+    .side-glyph,
+    .side-item,
+    .side-item::before,
+    .side-head,
+    .side-foot,
+    .side-mode,
+    .side-signout {
+      transition-duration: 0.01ms;
+    }
+  }
+}
+
+/* ==========================================================================
+   Brand chrome — the parent mark and the foot of the page
+   ========================================================================== */
+
+@layer components {
+  /* ---- ACI corner ------------------------------------------------------ */
+
+  /* The `.app-corner` wrapper that used to float this mark alone at the top of
+     the desk column is gone; the mark now sits at the right-hand end of
+     `.topbar`, below. Same position on screen, and the row it always occupied
+     now carries the page name, search and the desk count as well.
+
+     `.aci-corner` itself stays — the mobile shell and the bar both use it. */
+
+  .aci-corner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    /* Quiet by default. It is an attribution, not a control — it should be
+       findable without ever pulling the eye off the work. */
+    opacity: 0.62;
+    transition: opacity 0.2s var(--ease-standard);
+  }
+  .aci-corner:hover {
+    opacity: 1;
+  }
+
+  /* ---- Footer ----------------------------------------------------------- */
+
+  /* Two short lines of type and a fading rule. Deliberately quiet: it marks
+     the end of the page, it is not a thing to read. */
+  .app-foot {
+    margin-top: 34px;
+    padding: 0 20px calc(18px + env(safe-area-inset-bottom));
+    text-align: center;
+  }
+  @media (min-width: 640px) {
+    .app-foot {
+      margin-top: 44px;
+      padding: 0 26px 22px;
+    }
+  }
+
+  /* The rule thins with the line it introduces. It used to reach --rule-strong
+     at the centre, which made the hairline heavier than the type under it —
+     the divider was announcing a signature louder than the signature. */
+  .app-foot-rule {
+    display: block;
+    height: 1px;
+    margin-bottom: 9px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--rule) 38%,
+      var(--rule) 62%,
+      transparent
+    );
+    opacity: 0.55;
+    transition: opacity 0.4s var(--ease-standard);
+  }
+  .app-foot:hover .app-foot-rule,
+  .app-foot:focus-within .app-foot-rule {
+    opacity: 0.9;
+  }
+
+  /* ---- The credit line ----
+     A watermark, not a message.
+
+     It is now 7.5px at 38% opacity — genuinely at the edge of legibility, and
+     that is the intent: it should be findable by someone who goes looking and
+     invisible to everyone else. The letter-spacing goes UP as the size comes
+     down, which is what keeps a 7.5px mono line from collapsing into a smudge:
+     small type needs air between the characters, not less of it.
+
+     THE TRADE, STATED. At this size and opacity the line is far below the 4.5:1
+     that body text owes a reader. That is acceptable here and nowhere else,
+     because the line carries nothing a user needs — the company is named in
+     the chrome at the top of every page, and no task depends on reading this.
+     What makes it defensible rather than merely small is the reveal: the whole
+     footer lifts to full contrast on hover or keyboard focus, so a person who
+     wants it can always have it. A watermark you can turn up is a different
+     thing from text nobody can read.
+
+     The only colour is on the name, painted with the same blue → purple →
+     green ramp the wordmark uses, so the one gradient reads as a mark rather
+     than as decoration. */
+  .app-foot-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 7.5px;
+    font-weight: 400;
+    letter-spacing: 0.11em;
+    color: var(--ink-3);
+    opacity: 0.38;
+    transition:
+      opacity 0.4s var(--ease-standard),
+      letter-spacing 0.4s var(--ease-out-quart);
+  }
+  /* Scoped to the footer, not the line: the reveal should fire from anywhere
+     in the block, so a pointer drifting near it is enough. */
+  .app-foot:hover .app-foot-line,
+  .app-foot:focus-within .app-foot-line {
+    opacity: 1;
+    letter-spacing: 0.13em;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-foot-line,
+    .app-foot-rule {
+      transition: none;
+    }
+  }
+
+  .app-foot-dot {
+    width: 1.5px;
+    height: 1.5px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.55;
+  }
+
+  /* The name, and the only colour in the footer. `background-clip: text` needs
+     a transparent fill; the plain colour underneath it is what shows if a
+     browser cannot do the clip. */
+  .app-foot-who {
+    font-weight: 500;
+    color: var(--brand-purple);
+    background-image: linear-gradient(
+      100deg,
+      var(--brand-blue),
+      var(--brand-purple) 52%,
+      var(--brand-green)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+}
+
+/* ==========================================================================
+   The living wordmark, and the waits it fills
+   --------------------------------------------------------------------------
+   One gradient — blue into purple into green — drives three things: the
+   "Resale Intel" wordmark, the page loader, and the pending hint on a nav
+   link. Sharing the ramp is what makes them read as the same system rather
+   than three animations that happen to be on screen together.
+
+   The green is ACI's own (#00a966), so the wordmark resolves into the parent
+   company's colour at the end of every sweep. That is the whole idea.
+   ========================================================================== */
+
+@layer components {
+  :root {
+    --brand-blue: #2f8fe6;
+    --brand-purple: #6b4de8;
+    --brand-green: #00a966;
+  }
+
+  /* Text painted with the ramp.
+
+     The stop list repeats blue at both ends and the animation travels exactly
+     one full period, so the loop has no seam — a gradient that merely
+     ping-pongs reads as a scrub, not as flow. */
+  /* The wordmark carries the three brand colours as a STATIC ramp.
+     It used to travel on a 9s loop. Against a design language built on
+     restraint an infinitely moving rainbow is the one element that cannot
+     be defended — it is motion with no state behind it, and the eye keeps
+     returning to it. The colours stay, because they are the identity; the
+     saturation is down and the animation is gone. It reads now as a printed
+     signature rather than an effect. */
+  .brand-grad {
+    background-image: linear-gradient(
+      96deg,
+      var(--brand-blue) 0%,
+      var(--brand-purple) 46%,
+      var(--brand-green) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* The one place it still moves: a page is genuinely loading, so the mark
+     working is information rather than decoration. */
+  .brand-grad[data-busy="true"] {
+    /* A wider ramp so there is something to travel, and the stop list repeats
+       so the loop has no seam. */
+    background-image: linear-gradient(
+      96deg,
+      var(--brand-blue) 0%,
+      var(--brand-purple) 30%,
+      var(--brand-green) 60%,
+      var(--brand-purple) 80%,
+      var(--brand-blue) 100%
+    );
+    background-size: 260% 100%;
+    animation: brandFlow 2.6s linear infinite;
+  }
+  @keyframes brandFlow {
+    to {
+      background-position: -260% 50%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .brand-grad[data-busy="true"] {
+      animation: none;
+    }
+  }
+
+  /* ---- Page loader ------------------------------------------------------ */
+
+  /* Shown only while a route is actually suspended. Deliberately not a
+     spinner: a spinner says "something is happening somewhere", this says
+     which product is doing it, which is the more reassuring answer when the
+     wait is a database round trip rather than a hang. */
+  .pl {
+    display: grid;
+    place-items: center;
+    gap: 18px;
+    min-height: 58vh;
+    padding: 48px 24px;
+    text-align: center;
+  }
+
+  .pl-badge {
+    position: relative;
+    display: grid;
+    place-items: center;
+    animation: plFloat 3.4s var(--ease-standard) infinite;
+  }
+  @keyframes plFloat {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-5px) scale(1.03);
+    }
+  }
+
+  /* A soft halo breathing under the badge, offset from the float so the two
+     never peak together — synchronised motion reads as one stiff object. */
+  .pl-badge::before {
+    content: "";
+    position: absolute;
+    inset: -22%;
+    border-radius: 999px;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--brand-purple) 26%, transparent),
+      transparent 68%
+    );
+    animation: plHalo 3.4s var(--ease-standard) 0.5s infinite;
+  }
+  @keyframes plHalo {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.9);
+    }
+    50% {
+      opacity: 0.75;
+      transform: scale(1.12);
+    }
+  }
+
+  .pl-name {
+    font-family: var(--font-display);
+    font-size: 25px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1;
+  }
+
+  /* An indeterminate track. The bar is a third of the width and crosses on a
+     long ease, so it reads as travel rather than as a bouncing block. */
+  .pl-track {
+    position: relative;
+    width: 168px;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--surface-3);
+  }
+  .pl-track::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 34%;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--brand-blue),
+      var(--brand-purple),
+      var(--brand-green)
+    );
+    animation: plSlide 1.5s var(--ease-out-quart) infinite;
+  }
+  @keyframes plSlide {
+    0% {
+      transform: translateX(-110%);
+    }
+    100% {
+      transform: translateX(400%);
+    }
+  }
+
+  .pl-caption {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pl-badge,
+    .pl-badge::before {
+      animation: none;
+    }
+    .pl-track::after {
+      animation-duration: 3s;
+    }
+  }
+
+  /* ---- Pending nav link -------------------------------------------------- */
+
+  /* The bar that fills a nav item while its route is being fetched.
+     Starts invisible with a 120ms delay, so a navigation that resolves
+     quickly — most of them — never flashes anything at all. Only a wait
+     worth acknowledging gets acknowledged. */
+  .nav-pending {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: 999px;
+    overflow: hidden;
+    opacity: 0;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    animation: navFade 0.2s var(--ease-standard) 0.12s forwards;
+  }
+  @keyframes navFade {
+    to {
+      opacity: 1;
+    }
+  }
+  .nav-pending::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 40%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--brand-blue), var(--brand-purple), var(--brand-green));
+    animation: plSlide 1.1s var(--ease-out-quart) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nav-pending::after {
+      animation: none;
+      width: 100%;
+      opacity: 0.5;
+    }
+  }
+}
+
+/* ==========================================================================
+   Entrance choreography
+   --------------------------------------------------------------------------
+   A panel should assemble, not appear. The eye follows the order things
+   arrive in, so that order is the design: the hero lands first, the figures
+   follow, then the body of the work. Done well it reads as the page waking
+   up; done as thirty-four hand-picked delays scattered across components — as
+   it was — it reads as jitter.
+
+   So the timing is a scale, not a per-callsite guess. Four steps, ~55ms
+   apart: close enough to feel like one movement, far enough apart to be
+   legible as a sequence.
+
+   Everything here is switched off wholesale by the global
+   prefers-reduced-motion rule further up this file.
+   ========================================================================== */
+
+@layer components {
+  /* The base arrival: up and in, on a decelerating curve. `both` holds the
+     from-state during the delay, so a staggered child never flashes at full
+     opacity before its turn. */
+  .enter {
+    animation: riseIn 0.34s var(--ease-out-quart) both;
+  }
+  .enter-1 {
+    animation-delay: 0.05s;
+  }
+  .enter-2 {
+    animation-delay: 0.11s;
+  }
+  .enter-3 {
+    animation-delay: 0.17s;
+  }
+  .enter-4 {
+    animation-delay: 0.23s;
+  }
+
+  /* A row or grid whose children arrive in sequence.
+     Capped at eight: past that the last item is waiting long enough to feel
+     like the page is slow rather than composed, so everything after simply
+     arrives with the eighth. */
+  .stagger > * {
+    animation: riseIn 0.3s var(--ease-out-quart) both;
+  }
+  .stagger > *:nth-child(1) {
+    animation-delay: 0.03s;
+  }
+  .stagger > *:nth-child(2) {
+    animation-delay: 0.07s;
+  }
+  .stagger > *:nth-child(3) {
+    animation-delay: 0.11s;
+  }
+  .stagger > *:nth-child(4) {
+    animation-delay: 0.15s;
+  }
+  .stagger > *:nth-child(5) {
+    animation-delay: 0.19s;
+  }
+  .stagger > *:nth-child(6) {
+    animation-delay: 0.23s;
+  }
+  .stagger > *:nth-child(7) {
+    animation-delay: 0.27s;
+  }
+  .stagger > *:nth-child(n + 8) {
+    animation-delay: 0.31s;
+  }
+
+  /* ---- Figures that mean something ------------------------------------- */
+
+  /* A stat tile is a number someone is going to act on, so the tile answers
+     the pointer with more than a colour change: it lifts, and its glyph
+     leans in. Both on the spring curve, because a control that responds on a
+     linear ramp feels mechanical where this should feel eager. */
+  .stat-tile .stat-glyph {
+    transition: transform 0.26s var(--ease-spring);
+  }
+  .stat-tile:hover .stat-glyph {
+    transform: translateY(-1px) scale(1.08);
+  }
+
+  /* ---- Buttons --------------------------------------------------------- */
+
+  /* Press feedback belongs on the spring: the release is what the finger
+     feels, and an eased-out release reads as sluggish at these durations. */
+  .btn:active:not(:disabled) {
+    transition-duration: 0.08s;
+  }
+}
+
+/* ===========================================================================
+   THE DESK TOP BAR
+
+   The desk surface had no bar, and that space was not empty — it held the ACI
+   mark, alone, in a row nothing else justified. This does not add chrome; it
+   earns that row.
+
+   Three things, and each is here because the SIDE PANEL is bad at it:
+
+     where you are   auto-hide is the default panel mode, so most of the time
+                     the nav is a rail of unlabelled glyphs and nothing else on
+                     screen names the current page
+     search          Ctrl+K existed; its only visible affordance was at the
+                     foot of a panel that is shut by default
+     desk load       one number, counted from the transition table, linking to
+                     the queue it counts
+
+   Identity is deliberately absent. The account tile and sign-out are in the
+   panel's foot, one hover away, and a second copy here would put one control
+   in two places.
+
+   Stateless: sticky, a hairline, and no scroll listener. Nothing in it can get
+   stuck in the wrong state because it holds no state — the same argument the
+   auto-hide panel makes for being pure CSS.
+   ======================================================================== */
+
+@layer components {
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: var(--topbar-h);
+    padding: 0 18px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-alpha);
+    backdrop-filter: saturate(180%) blur(14px);
+  }
+  @supports not (backdrop-filter: blur(1px)) {
+    .topbar {
+      background: var(--surface);
+    }
+  }
+
+  /* Publishes its own height to the page beneath, exactly as the field shell
+     does with its bar. The marketplace's filter rail sticks to `--shell-top`
+     and has always resolved it to 0 on the desk — it now follows this bar down
+     instead of parking behind it, without the rail knowing this bar exists. */
+  .shell-desk {
+    --topbar-h: 46px;
+    --shell-top: var(--topbar-h);
+  }
+
+  /* ---- Where you are ---- */
+  .topbar-here {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .topbar-glyph {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .topbar-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ---- Search ----
+     Centred rather than tucked to one side: it is the one control in this bar
+     anybody presses, and the middle is the shortest travel from anywhere. */
+  .topbar-search {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 320px;
+    flex: 1 1 200px;
+    margin-inline: auto;
+    padding: 5px 9px 5px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    color: var(--ink-3);
+    font-size: 12.5px;
+    transition:
+      border-color 0.14s var(--ease-standard),
+      background 0.14s var(--ease-standard);
+  }
+  .topbar-search:hover {
+    border-color: var(--rule-strong);
+    background: var(--surface);
+  }
+  .topbar-search-text {
+    flex: 1 1 auto;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ---- Right cluster ---- */
+  .topbar-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    flex: none;
+  }
+
+  /* One number and what it means. Accent-tinted because it is the only thing
+     in this bar that is ever ABOUT to be acted on — everything else here
+     reports, this one asks. */
+  .topbar-load {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    color: var(--accent-ink-on-soft);
+    background: var(--accent-soft);
+    font-size: 12px;
+    white-space: nowrap;
+    transition: background 0.14s var(--ease-standard);
+  }
+  .topbar-load:hover {
+    background: var(--accent-soft-2);
+  }
+  .topbar-load-n {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .topbar-date {
+    font-size: 12px;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+
+  /* ---- Narrow ----
+     The bar sheds from the right inward, in order of how much each part is
+     worth per pixel: the date goes first (it is the least useful thing here),
+     then the desk label leaving the bare count, then the search label leaving
+     the magnifier. "Where you are" never goes — it is the reason the bar
+     exists on a shell whose nav is collapsed by default. */
+  @media (max-width: 1100px) {
+    .topbar-date {
+      display: none;
+    }
+  }
+  @media (max-width: 900px) {
+    .topbar-load-label {
+      display: none;
+    }
+    .topbar-search .kbd {
+      display: none;
+    }
+  }
+  @media (max-width: 720px) {
+    .topbar {
+      gap: 8px;
+      padding: 0 12px;
+    }
+    .topbar-search {
+      flex: none;
+      max-width: none;
+      padding: 5px 9px;
+    }
+    .topbar-search-text {
+      display: none;
+    }
+  }
+}

@@ -45,3 +45,12 @@ export async function uploadImage(file: File): Promise<{ name: string; url: stri
   const res = await fetch("/api/upload", { method: "POST", body: form });
   return parse<{ name: string; url: string }>(res);
 }
+
+/** Same endpoint, widened to accept a PDF. For the repair estimate sheet. */
+export async function uploadDocument(file: File): Promise<{ name: string; url: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("kind", "document");
+  const res = await fetch("/api/upload", { method: "POST", body: form });
+  return parse<{ name: string; url: string }>(res);
+}

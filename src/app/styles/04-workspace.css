@@ -1,0 +1,441 @@
+/* ==========================================================================
+   WORKSPACE
+   The shared desk architecture: a split list/detail workspace, a command
+   palette, saved views, a bulk-action bar and SLA rails. Every desk role
+   renders through these, so they are defined once here rather than per role.
+   ========================================================================== */
+
+@layer components {
+  /* ---- Segmented control ----
+     Used for the theme picker and the workspace density switch. The thumb is
+     a background on the active button rather than a sliding pseudo element,
+     so it stays correct when the control re-orders or wraps. */
+  .seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+  }
+  .seg-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 9px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-3);
+    background: transparent;
+    cursor: pointer;
+    transition:
+      background-color 0.18s var(--ease-standard),
+      color 0.18s var(--ease-standard),
+      box-shadow 0.18s var(--ease-standard);
+  }
+  .seg-btn:hover {
+    color: var(--ink-2);
+  }
+  .seg-btn[data-on="true"] {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-xs);
+  }
+  .seg-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  .seg-label {
+    letter-spacing: -0.005em;
+  }
+  @media (max-width: 900px) {
+    .seg-label {
+      display: none;
+    }
+  }
+
+  /* ---- Split workspace ----
+     One grid. The detail pane is a column that appears beside the list, so
+     opening a record widens the layout rather than swapping the list into a
+     different component tree. Below 1100px the detail becomes an overlay
+     sheet instead, because a two-pane split at that width leaves neither
+     pane usable. */
+  .ws {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+  .ws[data-detail="true"] {
+    grid-template-columns: minmax(0, 1fr) var(--ws-detail-w, 400px);
+  }
+  @media (max-width: 1100px) {
+    .ws[data-detail="true"] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .ws-detail {
+    position: sticky;
+    top: 14px;
+    max-height: calc(100vh - 28px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    animation: wsSlideIn 0.26s var(--ease-out-quart);
+  }
+  @keyframes wsSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes wsSheetUp {
+    from {
+      transform: translateY(14px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+
+  /* Narrow screens: the detail becomes a bottom sheet. */
+  @media (max-width: 1100px) {
+    .ws-detail {
+      position: fixed;
+      inset: auto 0 0 0;
+      top: 12vh;
+      z-index: 60;
+      max-height: 88vh;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      box-shadow: var(--shadow-xl);
+      animation: wsSheetUp 0.28s var(--ease-out-quart);
+    }
+  }
+
+  .ws-scrim {
+    display: none;
+  }
+  @media (max-width: 1100px) {
+    .ws-scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 59;
+      background: rgba(6, 10, 14, 0.42);
+      animation: fadeIn 0.2s var(--ease-standard);
+    }
+  }
+
+  /* ---- Workspace rows ----
+     A record row carries a left SLA rail. The rail is the only place colour
+     enters the list, so an at-risk file is findable by scanning one edge
+     rather than reading every date cell. */
+  .ws-row {
+    position: relative;
+    transition:
+      background-color 0.15s var(--ease-standard),
+      box-shadow 0.15s var(--ease-standard);
+  }
+  .ws-row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--sla-color, transparent);
+    opacity: 0.9;
+    transition: width 0.18s var(--ease-standard);
+  }
+  .ws-row:hover {
+    background: var(--surface-2);
+  }
+  .ws-row:hover::before {
+    width: 4px;
+  }
+  .ws-row[data-open="true"] {
+    background: var(--accent-soft);
+  }
+  .ws-row[data-open="true"]::before {
+    width: 4px;
+  }
+  .ws-row[data-picked="true"] {
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+  /* Keyboard cursor in the list, distinct from hover and from selection. */
+  .ws-row[data-cursor="true"] {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+  }
+
+  .sla-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--sla-color, var(--ink-3));
+    flex: none;
+  }
+
+  /* ---- Saved view chips ---- */
+  .viewchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .viewchip:hover {
+    border-color: var(--rule-strong);
+    color: var(--ink);
+  }
+  .viewchip[data-on="true"] {
+    background: var(--accent-soft);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    color: var(--accent-ink);
+  }
+  .viewchip-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    opacity: 0.75;
+  }
+
+  /* ---- Bulk action bar ----
+     Floats over the list rather than pushing it, so selecting rows never
+     shifts the rows you are still choosing from. */
+  .bulkbar {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    z-index: 55;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px 9px 16px;
+    border-radius: 999px;
+    background: var(--surface-alpha-strong);
+    border: 1px solid var(--rule-strong);
+    box-shadow: var(--shadow-xl);
+    animation: bulkUp 0.24s var(--ease-spring);
+  }
+  @keyframes bulkUp {
+    from {
+      opacity: 0;
+      transform: translate(-50%, 14px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+  }
+
+  /* ---- Command palette ---- */
+  .cmdk-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(6, 10, 14, 0.44);
+    animation: fadeIn 0.16s var(--ease-standard);
+  }
+  .cmdk {
+    position: fixed;
+    z-index: 91;
+    left: 50%;
+    top: 14vh;
+    width: min(620px, calc(100vw - 32px));
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+    animation: cmdkIn 0.2s var(--ease-out-quart);
+  }
+  @keyframes cmdkIn {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -8px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
+  }
+  .cmdk-input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    padding: 16px 16px 16px 44px;
+    font-size: 15px;
+    color: var(--ink);
+    font-family: var(--font-body);
+  }
+  .cmdk-input::placeholder {
+    color: var(--ink-3);
+  }
+  .cmdk-list {
+    max-height: min(52vh, 420px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-top: 1px solid var(--rule);
+    padding: 6px;
+  }
+  .cmdk-item {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: 9px;
+    text-align: left;
+    cursor: pointer;
+    color: var(--ink-2);
+    transition: background-color 0.12s var(--ease-standard);
+  }
+  .cmdk-item[data-on="true"] {
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+  .cmdk-group {
+    padding: 10px 11px 5px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: 5px;
+    border: 1px solid var(--rule-strong);
+    border-bottom-width: 2px;
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--ink-3);
+    line-height: 1;
+  }
+
+  /* ---- Analytics primitives ---- */
+  .spark-bar {
+    border-radius: 2px 2px 0 0;
+    background: var(--accent);
+    opacity: 0.3;
+    transition:
+      opacity 0.2s var(--ease-standard),
+      transform 0.3s var(--ease-out-quart);
+    transform-origin: bottom;
+  }
+  .spark-bar[data-on="true"] {
+    opacity: 1;
+  }
+  .spark:hover .spark-bar {
+    opacity: 0.52;
+  }
+  .spark .spark-bar:hover {
+    opacity: 1;
+  }
+
+  /* A horizontal proportion rail, for stage-distribution and desk-throughput
+     readouts where a full chart would be overkill. */
+  .prop-track {
+    display: flex;
+    height: 8px;
+    width: 100%;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--surface-3);
+  }
+  .prop-seg {
+    height: 100%;
+    transition: flex-grow 0.5s var(--ease-out-quart);
+  }
+}
+
+/* ==========================================================================
+   STAT TILE TINTS
+   Previously each tile picked a decorative hue (blue / violet / amber) which
+   put three unrelated colours on the most prominent element of six portals.
+   The set is now semantic: accent for the desk's own workload, info for
+   money, warn and bad for things going wrong, neutral for context. Nothing is
+   coloured for decoration, and every value is a token so dark mode follows.
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* The wash runs corner-to-corner and lands near-white, so the colour is
+       strongest where the label sits and has faded out by the caption. A flat
+       tint at this saturation would fight the figure for attention; a fade
+       lets the tile be tinted and the number still be the loudest thing. */
+    --tint-accent-from: rgba(219, 214, 251, 0.92);
+    --tint-accent-to: rgba(250, 249, 254, 0.7);
+    --tint-accent-ink: var(--accent);
+
+    --tint-info-from: rgba(201, 226, 246, 0.92);
+    --tint-info-to: rgba(246, 251, 254, 0.7);
+    --tint-info-ink: #2a6ba8;
+
+    --tint-warn-from: rgba(248, 231, 199, 0.92);
+    --tint-warn-to: rgba(255, 252, 245, 0.7);
+    --tint-warn-ink: var(--warn);
+
+    --tint-bad-from: rgba(247, 218, 212, 0.92);
+    --tint-bad-to: rgba(255, 250, 249, 0.7);
+    --tint-bad-ink: var(--bad);
+
+    /* Money and counts that are going right — realised value, stock that
+       reached the market. The set had no green, so every positive figure was
+       being tinted `info` and reading as merely informational. */
+    --tint-ok-from: rgba(206, 236, 220, 0.92);
+    --tint-ok-to: rgba(247, 253, 250, 0.7);
+    --tint-ok-ink: var(--ok);
+
+    --tint-neutral-from: rgba(223, 230, 235, 0.92);
+    --tint-neutral-to: rgba(249, 251, 252, 0.7);
+    --tint-neutral-ink: #4e5a66;
+  }
+}
+
+@layer components {
+  /* A stat tile acting as a filter control. */
+  .stat-tile[data-picked="true"] {
+    border-color: color-mix(in srgb, var(--tint-accent) 46%, transparent);
+    box-shadow: var(--shadow-md);
+  }
+  .stat-tile[data-picked="true"]::after {
+    transform: scaleX(1);
+  }
+}
+

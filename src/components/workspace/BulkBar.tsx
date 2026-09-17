@@ -96,7 +96,7 @@ export function BulkBar({
             {result.ok.length} succeeded, {result.failed.length} failed
           </p>
           <p className="truncate font-mono text-[11px] text-ink-3">
-            {result.failed.map((f) => f.label).join(", ")} — {result.failed[0].error}
+            {result.failed.map((f) => f.label).join(", ")}: {result.failed[0].error}
           </p>
         </div>
         <button

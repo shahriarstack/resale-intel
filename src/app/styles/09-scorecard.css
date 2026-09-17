@@ -1,0 +1,993 @@
+/* ==========================================================================
+   SCORECARD
+   --------------------------------------------------------------------------
+   The one backward-looking surface in the app: an engineer's own month, and
+   the Service Head's view of the same months across the workshop.
+
+   Two rules shape everything below.
+
+   First, it is read on a phone in a workshop and on a desk in HQ from the SAME
+   components, so the primitives are fluid rather than duplicated per surface —
+   the gauge, the ridge and the scrubber all size from their container.
+
+   Second, a performance figure has to look measured rather than decorated.
+   That means instrument language — ticks, needles, axes, a hairline baseline —
+   and it means colour is only ever spent on comparison (faster/slower,
+   up/down, on time/late), never on making a panel look lively. A card that
+   celebrates by default is a card nobody believes when it warns.
+   ========================================================================== */
+
+@layer components {
+  /* ---- Shell ----------------------------------------------------------- */
+
+  .sc-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    padding: 13px 14px 14px;
+  }
+
+  .sc-error {
+    border-radius: var(--radius);
+    border: 1px solid color-mix(in srgb, var(--bad) 25%, transparent);
+    background: var(--bad-soft);
+    color: var(--bad-ink);
+    padding: 8px 11px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .sc-empty {
+    padding: 14px 2px;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  /* A section rule inside a card: mono eyebrow left, quiet meta right. */
+  .sc-sec {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .sc-sec-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sc-sec-title svg {
+    color: var(--accent);
+  }
+  .sc-sec-meta {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+
+  /* ---- Month scrubber --------------------------------------------------
+     A rail rather than a dropdown: the comparison this whole surface exists
+     for is between neighbouring months, and a <select> hides adjacency behind
+     a tap. The arrows make one-step movement a single thumb press. */
+
+  .sc-scrub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: 11px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    transition: opacity 0.2s var(--ease-standard);
+  }
+  .sc-scrub[data-busy="true"] {
+    opacity: 0.62;
+  }
+
+  .sc-step {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 8px;
+    color: var(--ink-2);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    cursor: pointer;
+    transition:
+      color 0.15s var(--ease-standard),
+      border-color 0.15s var(--ease-standard);
+  }
+  .sc-step:hover:not(:disabled) {
+    color: var(--accent);
+    border-color: var(--accent-line);
+  }
+  .sc-step:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .sc-rail {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  .sc-month {
+    flex: 1 0 auto;
+    min-width: 38px;
+    padding: 5px 6px 4px;
+    border-radius: 7px;
+    text-align: center;
+    line-height: 1.1;
+    cursor: pointer;
+    scroll-snap-align: center;
+    transition:
+      background-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .sc-month:hover {
+    background: var(--surface);
+  }
+  .sc-month[data-on="true"] {
+    background: var(--accent);
+    box-shadow: var(--shadow-xs);
+  }
+  .sc-month-name {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .sc-month[data-on="true"] .sc-month-name {
+    color: #fff;
+  }
+  .sc-month-year {
+    display: block;
+    min-height: 10px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    color: var(--ink-3);
+  }
+  .sc-month[data-on="true"] .sc-month-year {
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  /* The full label, spelled out once. The rail is abbreviations; something on
+     screen has to say which year the reader is actually looking at. */
+  .sc-scrub-now {
+    display: none;
+    flex: none;
+    padding-right: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  @media (min-width: 900px) {
+    .sc-scrub-now {
+      display: inline;
+    }
+  }
+
+  /* ---- Delta -----------------------------------------------------------
+     Direction is arithmetic, colour is meaning. The arrow always follows the
+     sign; only the colour knows whether falling was good. */
+
+  .sc-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .sc-delta[data-tone="up"] {
+    color: var(--ok);
+  }
+  .sc-delta[data-tone="down"] {
+    color: var(--bad);
+  }
+  .sc-delta[data-tone="flat"] {
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+
+  /* ---- Headline --------------------------------------------------------- */
+
+  .sc-headline {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 13px;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in srgb, var(--hl) 26%, var(--rule));
+    background: linear-gradient(
+      152deg,
+      color-mix(in srgb, var(--hl) 11%, var(--surface)),
+      var(--surface) 74%
+    );
+  }
+  .sc-headline p {
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+  }
+  .sc-headline[data-tone="ok"] {
+    --hl: var(--ok);
+  }
+  .sc-headline[data-tone="warn"] {
+    --hl: var(--warn);
+  }
+  .sc-headline[data-tone="accent"] {
+    --hl: var(--accent);
+  }
+  .sc-headline[data-tone="neutral"] {
+    --hl: var(--ink-3);
+  }
+  .sc-headline-glyph {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 9px;
+    color: var(--hl);
+    background: color-mix(in srgb, var(--hl) 15%, var(--surface));
+  }
+
+  /* ---- Hero: gauge beside the readings ---------------------------------- */
+
+  .sc-hero {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    transition: opacity 0.2s var(--ease-standard);
+  }
+  .sc-hero[data-busy="true"] {
+    opacity: 0.55;
+  }
+  @media (min-width: 640px) {
+    .sc-hero {
+      grid-template-columns: minmax(200px, 260px) 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+  }
+
+  .sc-gauge {
+    max-width: 280px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .sc-gauge-value {
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 700;
+    fill: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .sc-gauge-unit,
+  .sc-gauge-end,
+  .sc-gauge-mark {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    fill: var(--ink-3);
+  }
+  .sc-gauge-mark {
+    font-size: 7px;
+    fill: var(--ink-2);
+  }
+  .sc-gauge-caption {
+    margin-top: -2px;
+    text-align: center;
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--ink-2);
+  }
+
+  .sc-hero-side {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  @media (min-width: 640px) {
+    .sc-hero-side {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+  }
+
+  /* A reading is a number, not a card — three of them next to a gauge would
+     otherwise read as four competing panels. Its tone is carried by the label,
+     the same way the desk panels' readings carry theirs. */
+  .sc-read {
+    min-width: 0;
+  }
+  .sc-read[data-tone="ok"] {
+    --read-tone: var(--ok);
+  }
+  .sc-read[data-tone="accent"] {
+    --read-tone: var(--accent);
+  }
+  .sc-read[data-tone="warn"] {
+    --read-tone: var(--warn);
+  }
+  .sc-read-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--read-tone, var(--ink-3));
+  }
+  .sc-read-value {
+    margin-top: 2px;
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .sc-read-foot {
+    margin-top: 3px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 7px;
+  }
+  .sc-read-caption {
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+
+  /* On a phone the three readings sit side by side under the gauge, roughly
+     105px each. A caption like "jobs finished this month" wraps to four lines
+     there and triples the height of the block for a sentence the gauge caption
+     and the flow note below already make. The label, the figure and the change
+     survive; the prose does not. */
+  @media (max-width: 639px) {
+    .sc-read-value {
+      font-size: 19px;
+    }
+    .sc-read-caption {
+      display: none;
+    }
+  }
+
+  /* ---- Flow ------------------------------------------------------------- */
+
+  .sc-flow-row {
+    display: grid;
+    grid-template-columns: 68px 1fr 30px;
+    align-items: center;
+    gap: 9px;
+    padding: 3px 0;
+  }
+  .sc-flow-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sc-flow-track {
+    height: 9px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  .sc-flow-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.42s var(--ease-out-quart);
+  }
+  .sc-flow-value {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .sc-flow-note {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--rule);
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--ink-2);
+  }
+
+  /* ---- Kind rows -------------------------------------------------------- */
+
+  .sc-kind {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .sc-kind:first-of-type {
+    border-top: 0;
+    padding-top: 2px;
+  }
+  .sc-kind-glyph {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 9px;
+    color: var(--kind);
+    background: color-mix(in srgb, var(--kind) 12%, var(--surface));
+  }
+  .sc-kind-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .sc-kind-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .sc-kind-count {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .sc-kind-of {
+    font-weight: 500;
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+  .sc-kind-blurb {
+    margin-top: 1px;
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+  .sc-kind-time {
+    flex: none;
+    min-width: 52px;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  /* ---- Trend ridge ------------------------------------------------------
+     Volume up, pace down, across a shared month axis. Facing ridges rather
+     than an overlaid line, because an overlay would assert that "nine jobs"
+     and "two days" share a scale. They do not; only their months do. */
+
+  .sc-ridge {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .sc-ridge-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 0 3px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background-color 0.16s var(--ease-standard);
+  }
+  .sc-ridge-col:hover {
+    background: var(--surface-2);
+  }
+  .sc-ridge-col[data-on="true"] {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+  }
+  .sc-ridge-num {
+    height: 12px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+  }
+  .sc-ridge-up {
+    display: flex;
+    align-items: flex-end;
+    height: 48px;
+    width: 100%;
+    padding: 0 2px;
+  }
+  .sc-ridge-fill {
+    display: block;
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    background: var(--cat-repair);
+    transition: height 0.36s var(--ease-out-quart);
+  }
+  .sc-ridge-fill[data-empty="true"] {
+    background: var(--rule-strong);
+  }
+  .sc-ridge-axis {
+    width: 100%;
+    padding: 2px 0;
+    border-top: 1px solid var(--rule-strong);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: center;
+  }
+  .sc-ridge-col[data-on="true"] .sc-ridge-axis {
+    color: var(--accent-ink);
+    font-weight: 700;
+  }
+  .sc-ridge-down {
+    display: flex;
+    align-items: flex-start;
+    height: 28px;
+    width: 100%;
+    padding: 0 3px;
+  }
+  .sc-ridge-pace {
+    display: block;
+    width: 100%;
+    border-radius: 0 0 3px 3px;
+    background: var(--ink-3);
+    opacity: 0.55;
+    transition: height 0.36s var(--ease-out-quart);
+  }
+  .sc-ridge-pace[data-empty="true"] {
+    background: var(--rule-strong);
+    opacity: 1;
+  }
+
+  .sc-legend {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sc-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sc-key {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+  }
+
+  /* ---- Quality ---------------------------------------------------------- */
+
+  .sc-quality {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+  }
+  .sc-quality-value {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+  }
+  .sc-quality-label {
+    margin-top: 3px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .sc-quality-meta {
+    margin-top: 1px;
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: var(--ink-3);
+  }
+
+  /* ---- Marks ------------------------------------------------------------ */
+
+  .sc-marks {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .sc-marks li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--ink-2);
+  }
+  .sc-marks li svg {
+    margin-top: 1px;
+    flex: none;
+    color: var(--ink-3);
+  }
+  .sc-marks b {
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  /* ---- Receipts ---------------------------------------------------------
+     Collapsed, but present. The fastest way to make someone distrust a
+     performance figure is to give them no way to check it. */
+
+  .sc-receipt-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    cursor: pointer;
+  }
+  .sc-receipt-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+  .sc-receipt-meta svg {
+    transition: transform 0.22s var(--ease-standard);
+  }
+
+  .sc-receipts {
+    margin-top: 10px;
+    border-top: 1px solid var(--rule);
+    animation: fadeIn 0.2s var(--ease-standard);
+  }
+  .sc-job {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 2px;
+    border-bottom: 1px solid var(--rule);
+    transition: background-color 0.14s var(--ease-standard);
+  }
+  .sc-job:last-child {
+    border-bottom: 0;
+  }
+  .sc-job:hover {
+    background: var(--surface-2);
+  }
+  .sc-job-glyph {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 8px;
+  }
+  .sc-job-glyph[data-kind="assessment"] {
+    color: var(--cat-assess);
+    background: var(--cat-assess-soft);
+  }
+  .sc-job-glyph[data-kind="repair"] {
+    color: var(--cat-repair);
+    background: var(--cat-repair-soft);
+  }
+  .sc-job-name {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sc-job-sub {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--ink-3);
+  }
+  .sc-job-tags {
+    display: inline-flex;
+    flex: none;
+    gap: 3px;
+  }
+  .sc-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 5px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .sc-tag[data-tone="ok"] {
+    color: var(--ok-ink);
+    background: var(--ok-soft);
+  }
+  .sc-tag[data-tone="bad"] {
+    color: var(--bad-ink);
+    background: var(--bad-soft);
+  }
+  .sc-tag[data-tone="neutral"] {
+    color: var(--ink-3);
+    background: var(--surface-2);
+  }
+  .sc-job-time {
+    flex: none;
+    min-width: 50px;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  /* ======================================================================
+     Team scorecard — the Service Head's tab
+     ====================================================================== */
+
+  .sc-totals {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 9px;
+  }
+  @media (min-width: 780px) {
+    .sc-totals {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  .sc-total {
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    padding: 10px 12px 11px;
+  }
+  .sc-total-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sc-total-head svg {
+    color: var(--accent);
+  }
+  .sc-total-value {
+    margin-top: 4px;
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .sc-total-foot {
+    margin-top: 3px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px 7px;
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+
+  /* ---- The workshop plot ------------------------------------------------
+     Volume across, pace up, cross-haired on the shop's own medians. Top-right
+     is the good corner, which is why "faster is higher" is worth the inverted
+     axis: a reader should not have to remember which direction to want. */
+
+  .sc-plot {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    padding: 13px 14px 12px;
+  }
+  .sc-plot-axis {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    fill: var(--ink-3);
+  }
+  .sc-plot-note,
+  .sc-plot-empty {
+    margin-top: 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-3);
+  }
+  .sc-plot-empty {
+    margin-top: 0;
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--rule-strong);
+    background: var(--surface-2);
+    padding: 18px 14px;
+    text-align: center;
+  }
+  .sc-dot {
+    cursor: pointer;
+  }
+  .sc-dot circle {
+    transition:
+      r 0.18s var(--ease-out-quart),
+      stroke-width 0.18s var(--ease-standard);
+  }
+  .sc-dot:hover circle {
+    r: 15;
+    stroke-width: 2.4;
+  }
+  .sc-dot-text {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    fill: var(--ink);
+    pointer-events: none;
+  }
+
+  /* ---- Rows ------------------------------------------------------------- */
+
+  .sc-table tbody tr.sc-row {
+    cursor: pointer;
+  }
+  .sc-row[data-idle="true"] td {
+    color: var(--ink-3);
+  }
+  .sc-row[data-busy="true"] td {
+    opacity: 0.5;
+  }
+  .sc-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .sc-staff {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--ink-3);
+  }
+  /* The figure sits above its own change, so a scanned column stays a column
+     of numbers rather than a column of numbers-and-arrows. */
+  .sc-cell-strong {
+    display: block;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .sc-split {
+    display: inline-flex;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-2);
+  }
+  .sc-split span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .sc-split svg {
+    color: var(--ink-3);
+  }
+
+  .sc-spark-head {
+    text-align: right;
+  }
+  .sc-spark {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 1.5px;
+    height: 24px;
+  }
+  .sc-spark-bar {
+    display: block;
+    width: 4px;
+    border-radius: 1.5px 1.5px 0 0;
+    background: var(--rule-strong);
+  }
+  .sc-spark-bar[data-last="true"] {
+    background: var(--accent);
+  }
+  .sc-spark-bar[data-empty="true"] {
+    background: var(--rule);
+  }
+
+  .sc-table-foot {
+    border-top: 1px solid var(--rule);
+    background: var(--surface-2);
+    padding: 9px 16px;
+    font-size: 10.5px;
+    line-height: 1.45;
+    color: var(--ink-3);
+  }
+
+  /* ======================================================================
+     Service Head analytics tabs
+     ====================================================================== */
+
+  .head-tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .head-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    padding: 8px 13px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-3);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard);
+  }
+  .head-tab:hover {
+    color: var(--ink-2);
+  }
+  .head-tab[data-on="true"] {
+    color: var(--accent-ink);
+    border-bottom-color: var(--accent);
+  }
+  .head-tab svg {
+    color: currentColor;
+  }
+  .head-tab-panel {
+    animation: fadeIn 0.22s var(--ease-standard);
+  }
+  /* The blocks inside a panel each open with their own top margin; the tab
+     strip already provides that separation. */
+  .head-tab-panel > section:first-child,
+  .head-tab-panel > div:first-child {
+    margin-top: 14px;
+  }
+}
+

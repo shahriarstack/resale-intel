@@ -1,0 +1,289 @@
+/* ===========================================================================
+   THE INTAKE CHOOSER — "What are you adding?"
+
+   Three cards, one per way a vehicle leaves the road. They used to be the
+   generic `.card` with a 3px coloured strip down the left edge and the
+   category's hue repeated four times over: on the border, on the icon plate,
+   on the eyebrow and on the call to action.
+
+   The border is gone, and this is the rule the rest of the field panel
+   already follows — stated in the README as "no coloured left borders". That
+   marker was doing the same job on four unrelated surfaces across the
+   product, at which point it had stopped being a signal, and on a phone it
+   ate 3px of an already narrow card.
+
+   What replaces it is not another marker. The card is quiet at rest and the
+   category announces itself on approach:
+
+     rest      one tinted plate, everything else in ink. The plate is where
+               the eye lands anyway, so it is the only thing that needs the
+               hue — the eyebrow and the CTA went back to neutral, which is
+               what makes the plate legible AS the category rather than as
+               one of four coloured things.
+     hover     a soft wash blooms from behind the plate, the CTA takes the
+               tone, and the arrow steps forward. Colour arrives when you
+               reach for the card, which is when it is information.
+
+   "A surface is tinted only when the tint is the information."
+   ======================================================================== */
+
+@layer components {
+  .intake-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    background: var(--surface);
+    /* A ring rather than a border: it does not take part in layout, so the
+       card cannot shift by a pixel when it thickens on hover. */
+    box-shadow:
+      inset 0 0 0 1px var(--rule),
+      0 1px 2px rgba(16, 24, 40, 0.04);
+    transition:
+      box-shadow 0.2s var(--ease-standard),
+      translate 0.2s var(--ease-out-quart),
+      scale 0.2s var(--ease-out-quart);
+  }
+
+  /* The lift uses `translate`, NOT `transform`.
+     The card carries an inline `animation: slideUp … both` for its entrance,
+     and a filled animation keeps its final keyframe applied for the life of
+     the element — `transform: translateY(0)`. Animations outrank normal
+     declarations in the cascade, so a `transform` here is overwritten and the
+     hover silently does nothing. `translate` is an independent property the
+     animation never touches, and the two compose. */
+  .intake-card:hover {
+    translate: 0 -2px;
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--tone) 26%, var(--rule)),
+      0 8px 22px -12px color-mix(in srgb, var(--tone) 50%, transparent),
+      0 2px 6px -3px rgba(16, 24, 40, 0.1);
+  }
+  .intake-card:active {
+    translate: 0 0;
+    scale: 0.995;
+  }
+
+  /* ---- The wash ----
+     Anchored to the top-left, which is where the plate is, so the colour
+     reads as coming FROM the category mark rather than being painted over
+     the card. Zero at rest: at no point is this decoration sitting on a
+     record about somebody losing a vehicle. */
+  .intake-wash {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+      70% 120% at 0% 0%,
+      color-mix(in srgb, var(--tone) 14%, transparent) 0%,
+      transparent 70%
+    );
+    transition: opacity 0.24s var(--ease-standard);
+  }
+  .intake-card:hover .intake-wash {
+    opacity: 1;
+  }
+
+  /* ---- The plate ----
+     The one place the hue lives at rest. The inner ring is what stops a
+     12% tint from reading as a smudge on a white card. */
+  .intake-plate {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    flex: none;
+    border-radius: 13px;
+    color: var(--tone);
+    background: color-mix(in srgb, var(--tone) 11%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 18%, transparent);
+    transition:
+      background-color 0.2s var(--ease-standard),
+      transform 0.24s var(--ease-spring);
+  }
+  .intake-card:hover .intake-plate {
+    background: color-mix(in srgb, var(--tone) 16%, var(--surface));
+    transform: scale(1.04);
+  }
+
+  .intake-body {
+    display: block;
+    min-width: 0;
+    flex: 1;
+  }
+
+  /* Neutral, not toned. Three cards each with a coloured eyebrow made the
+     page read as a colour chart; the words already say which is which. */
+  .intake-eyebrow {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .intake-title {
+    margin-top: 3px;
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+
+  .intake-blurb {
+    margin-top: 6px;
+    max-width: 58ch;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+
+  /* ---- The call to action ----
+     Ink at rest, tone on approach. This is the swap that makes the card
+     minimal without making it mute: nothing is lost when it is quiet,
+     because the label already says what the card does. */
+  .intake-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 11px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-3);
+    transition: color 0.2s var(--ease-standard);
+  }
+  .intake-card:hover .intake-cta {
+    color: var(--tone);
+  }
+  .intake-arrow {
+    transition: transform 0.24s var(--ease-out-quart);
+  }
+  .intake-card:hover .intake-arrow {
+    transform: translateX(3px);
+  }
+
+  /* Touch has no hover, so the tone would never appear on a phone — which is
+     the surface this page is mostly used on. There the resting state IS the
+     final state, so the plate carries a little more colour to compensate and
+     the CTA is toned from the start. */
+  @media (hover: none) {
+    .intake-plate {
+      background: color-mix(in srgb, var(--tone) 15%, var(--surface));
+    }
+    .intake-cta {
+      color: var(--tone);
+    }
+  }
+
+  /* ---- The window card ----
+     The one option on this page that is not permanent, and it has to read as
+     such: an officer must never mistake a temporary authorisation for the way
+     things now work. So it is the only card here that carries its tone at
+     rest, and the only one with a clock on it.
+
+     A ticket, essentially — the dashed edge is the metaphor doing the work.
+     Everything else on this page is a standing door; this is a pass that
+     expires, and dashes are what an expiring thing looks like on paper. */
+  .intake-card-window {
+    background: color-mix(in srgb, var(--warn) 5%, var(--surface));
+    box-shadow:
+      inset 0 0 0 1px var(--warn-line),
+      0 1px 2px rgba(16, 24, 40, 0.04);
+  }
+  .intake-card-window::before {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: 14px;
+    border: 1px dashed color-mix(in srgb, var(--warn) 34%, transparent);
+  }
+  .intake-card-window:hover {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--warn) 52%, var(--rule)),
+      0 8px 22px -12px color-mix(in srgb, var(--warn) 50%, transparent),
+      0 2px 6px -3px rgba(16, 24, 40, 0.1);
+  }
+  /* The eyebrow and the clock share a line — the label says what kind of
+     permission this is, the clock says how much of it is left, and they are
+     one statement rather than two stacked ones. */
+  .intake-window-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .intake-card-window .intake-eyebrow {
+    color: var(--warn-ink);
+  }
+  .intake-window-clock {
+    flex: none;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--warn) 15%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 26%, transparent);
+    padding: 2px 8px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--warn-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  /* The admin's own words, quoted. Set apart from the blurb because it is
+     somebody's sentence rather than ours, and an officer asked later why a
+     vehicle has no request should be able to point at it. */
+  .intake-window-reason {
+    display: block;
+    margin-top: 9px;
+    padding-left: 9px;
+    border-left: 2px solid color-mix(in srgb, var(--warn) 30%, transparent);
+    font-size: 12px;
+    line-height: 1.5;
+    font-style: italic;
+    color: var(--warn-ink);
+  }
+  .intake-card-window .intake-cta {
+    color: var(--warn-ink);
+    gap: 8px;
+  }
+  .intake-window-left {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .intake-card,
+    .intake-plate,
+    .intake-arrow,
+    .intake-wash {
+      transition: none !important;
+    }
+    .intake-card:hover,
+    .intake-card:active {
+      translate: none;
+      scale: none;
+    }
+    .intake-card:hover .intake-plate {
+      transform: none;
+    }
+    .intake-card:hover .intake-arrow {
+      transform: none;
+    }
+  }
+}

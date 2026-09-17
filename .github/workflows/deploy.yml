@@ -1,0 +1,18 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  deploy:
+    name: Trigger cPanel Git Update
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cPanel UAPI to Pull and Deploy
+        run: |
+          curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
+          "https://116.202.222.251:2083/execute/VersionControl/update?repository_root=/home/cvacimot/repositories/resale&branch=rebuild/foundations" -k
+          curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
+          "https://116.202.222.251:2083/execute/VersionControlDeployment/create?repository_root=/home/cvacimot/repositories/resale" -k

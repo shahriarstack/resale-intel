@@ -1,0 +1,709 @@
+/* ==========================================================================
+   MATERIAL & MOTION
+   The refinement pass: compact surfaces, one consistent light source, and
+   micro-interactions that report state rather than decorate.
+
+   Three rules everything here follows.
+   1. Motion is feedback. If an animation does not tell you something changed,
+      it does not ship.
+   2. Transforms and opacity only. Animating layout properties on a table of
+      live records drops frames on the mid-range phones the field teams carry.
+   3. Small. A 1px lift and a 0.6% press are legible without the interface
+      appearing to breathe.
+   ========================================================================== */
+
+@layer components {
+  /* ---- Surfaces ----
+     Cards sit flat by default; lift is opt-in via .card-lift so a static
+     container never pretends to be a control. */
+  .card {
+    border-radius: var(--radius);
+    transition:
+      box-shadow 0.26s var(--ease-out-quart),
+      border-color 0.2s var(--ease-standard),
+      transform 0.26s var(--ease-out-quart);
+  }
+  .card-lift {
+    will-change: transform;
+  }
+  .card-lift:hover {
+    border-color: var(--rule-strong);
+  }
+
+  .card-lift:active {
+    transform: translateY(0);
+    transition-duration: 0.09s;
+  }
+
+  /* ---- Buttons ----
+     A press should feel like the surface takes the load: it sinks slightly
+     and its shadow tightens at the same moment. Scale alone reads as a
+     cartoon bounce. */
+  .btn {
+    transition:
+      background-color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard),
+      box-shadow 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard),
+      transform 0.1s var(--ease-standard);
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.985) translateY(0.5px);
+  }
+  .btn-primary:active:not(:disabled) {
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.16),
+      0 0 0 rgba(85, 70, 224, 0);
+  }
+  /* Trailing icons lead the eye toward what the button does. */
+  .btn > svg:last-child:not(:first-child) {
+    transition: transform 0.24s var(--ease-out-quart);
+  }
+  .btn:hover:not(:disabled) > svg:last-child:not(:first-child) {
+    transform: translateX(1.5px);
+  }
+
+  /* ---- Focus ----
+     One ring, drawn outside the control, that scales in rather than snapping.
+     Keyboard users get the same quality of feedback as pointer users. */
+  .btn:focus-visible,
+  .viewchip:focus-visible,
+  .seg-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+    animation: ringIn 0.18s var(--ease-out-quart);
+  }
+  @keyframes ringIn {
+    from {
+      box-shadow: 0 0 0 0 var(--ring);
+    }
+  }
+
+  /* ---- Table rows ----
+     The hover state is a wash plus a hairline brightening on the SLA rail —
+     no movement. Rows that shift on hover make a dense table feel unstable
+     and make a two-row target hard to hit. */
+  .dtable tbody td {
+    transition:
+      background-color 0.14s var(--ease-standard),
+      color 0.14s var(--ease-standard);
+  }
+  .ws-row {
+    transition:
+      background-color 0.14s var(--ease-standard),
+      box-shadow 0.16s var(--ease-standard);
+  }
+  .ws-row::before {
+    transition:
+      width 0.2s var(--ease-out-quart),
+      opacity 0.2s var(--ease-standard);
+  }
+  /* Quick actions stay quiet until the row is under the pointer, so a long
+     queue reads as records rather than as a wall of buttons. */
+  .ws-row .btn {
+    opacity: 0.82;
+    transition:
+      opacity 0.16s var(--ease-standard),
+      background-color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard),
+      transform 0.1s var(--ease-standard);
+  }
+  .ws-row:hover .btn,
+  .ws-row[data-open="true"] .btn,
+  .ws-row:focus-within .btn {
+    opacity: 1;
+  }
+
+  /* ---- Chips ---- */
+  .chip {
+    transition:
+      background-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .viewchip {
+    transition:
+      background-color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard),
+      transform 0.16s var(--ease-out-quart);
+  }
+  .viewchip:active {
+    transform: scale(0.975);
+  }
+
+  /* ---- Segmented control ----
+     The active segment lifts a hair off the track, the way a physical switch
+     sits proud of its housing. */
+  .seg-btn {
+    transition:
+      background-color 0.2s var(--ease-standard),
+      color 0.2s var(--ease-standard),
+      box-shadow 0.2s var(--ease-standard),
+      transform 0.2s var(--ease-out-quart);
+  }
+  .seg-btn[data-on="true"] {
+    transform: translateY(-0.5px);
+  }
+  .seg-btn:active {
+    transform: translateY(0) scale(0.97);
+  }
+
+  /* ---- Sidebar navigation ----
+     The active marker grows from the centre instead of appearing, so moving
+     between pages reads as one object travelling rather than two blinking. */
+  nav a .relative > span {
+    transition: transform 0.3s var(--ease-spring);
+  }
+
+  /* ---- Staggered entry ----
+     Applied by index so a list assembles instead of snapping in. Capped in
+     the components at ~12 items: past that the last row waits long enough to
+     feel like latency rather than polish. */
+  @keyframes riseIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .rise {
+    animation: riseIn 0.32s var(--ease-out-quart) both;
+  }
+
+  /* ---- Inputs ----
+     The well brightens and the ring blooms together on focus. */
+  .field {
+    transition:
+      border-color 0.18s var(--ease-standard),
+      box-shadow 0.18s var(--ease-standard),
+      background-color 0.18s var(--ease-standard);
+  }
+
+  /* ---- Scrollbars ----
+     Invisible until the surface is touched. */
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+    transition: background-color 0.2s var(--ease-standard);
+  }
+  *:hover::-webkit-scrollbar-thumb {
+    background: var(--rule-strong);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-3);
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   Someone who has asked their OS for less movement means it. Everything above
+   degrades to an instant state change — the information is in the state, not
+   in the travel, so nothing is lost.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-lift:hover,
+  .stat-tile:hover,
+  .seg-btn[data-on="true"] {
+    transform: none !important;
+  }
+}
+
+/* ==========================================================================
+   DENSITY
+   Enterprise surfaces earn trust by fitting more true information on screen,
+   not by breathing. These overrides tighten the shared components that the
+   earlier passes left at marketing-page proportions, without dropping below
+   the 32px hit target that a row's controls still need.
+   ========================================================================== */
+
+@layer components {
+  /* ---- Data tables ----
+     Header becomes a quieter rail: smaller, wider-tracked, and separated by a
+     stronger rule so it reads as a boundary rather than a first row. */
+  .dtable thead th {
+    padding: 8px 14px;
+    font-size: 9.5px;
+    letter-spacing: 0.13em;
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .dtable tbody td {
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+  /* The last row's rule is the card's own edge; drawing both is a double line. */
+  .dtable tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  /* ---- Metric tiles (admin overview) ----
+     Brought into line with .stat-tile so the two never appear at different
+     densities on the same page. */
+  .metric {
+    padding: 11px 12px 10px;
+    border-radius: var(--radius);
+  }
+  .metric-value {
+    font-size: 23px;
+    letter-spacing: -0.032em;
+  }
+  .metric-label {
+    font-size: 9px;
+    letter-spacing: 0.13em;
+  }
+  .metric-sub {
+    font-size: 9.5px;
+    margin-top: 3px;
+  }
+  .metric-glyph {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    transition: transform 0.35s var(--ease-spring);
+  }
+  .metric:hover .metric-glyph {
+    transform: scale(1.06);
+  }
+
+  /* ---- Chips ----
+     Slightly tighter, and a hairline of their own colour so a soft-tone pill
+     still has an edge on a white card. Borderless chips disappear at the
+     small sizes this interface uses them at. */
+  .chip {
+    padding: 2.5px 8px;
+    font-size: 10px;
+    letter-spacing: 0.025em;
+  }
+  .chip-accent {
+    border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+  .chip-ok {
+    border-color: color-mix(in srgb, var(--ok) 20%, transparent);
+  }
+  .chip-warn {
+    border-color: color-mix(in srgb, var(--warn) 22%, transparent);
+  }
+  .chip-bad {
+    border-color: color-mix(in srgb, var(--bad) 22%, transparent);
+  }
+  .chip-neutral {
+    border-color: var(--rule);
+  }
+
+  /* ---- Buttons ----
+     A touch shorter, and small buttons get a tighter radius than their
+     containers so nesting stays readable. */
+  .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 9px;
+  }
+  .btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+    border-radius: 7px;
+  }
+
+  /* ---- Fields ---- */
+  .field {
+    padding: 8px 11px;
+    font-size: 13.5px;
+    border-radius: 9px;
+  }
+  .label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    margin-bottom: 5px;
+  }
+
+  /* ---- Eyebrow / section headings ---- */
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.17em;
+  }
+
+  /* ---- Hero ----
+     The panel was sized for a marketing banner. It is a page header. */
+  .hero .page-title {
+    letter-spacing: -0.025em;
+  }}
+
+/* ==========================================================================
+   LIQUID GLASS
+   Chrome surfaces — sidebar, headers, palette, sheets, floating bars — are
+   rendered as glass rather than as opaque panels.
+
+   A blur alone is not glass; it is frosted plastic. Real glass shows four
+   things, and this layer draws all four:
+
+     1. Refraction  — backdrop-filter blurs AND over-saturates what is behind,
+                      because glass concentrates colour as well as scattering it.
+     2. Specular    — a bright hairline along the top edge where light catches
+                      the bevel, fading out down the sides.
+     3. Body        — a faint tint so the pane has substance and is not a hole.
+     4. Depth       — an inner shade on the bottom edge, so the pane reads as
+                      having thickness rather than being a decal.
+
+   The accent leaks into the tint very slightly. That is what stops the glass
+   reading as generic grey frost and ties it to the brand.
+   ========================================================================== */
+
+@layer components {
+  .glass {
+    position: relative;
+    /* Formerly a translucent pane with a specular bevel. It is now an opaque
+       surface with a rule and one shadow, because it sits above the page and
+       that is all "above the page" needs to say. */
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    box-shadow: var(--shadow-md);
+  }
+
+
+  /* For chrome that must stay readable over arbitrary scrolling content. */
+  .glass-strong {
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    box-shadow: var(--shadow-lg);
+  }
+
+
+  /* The travelling highlight along the top edge. Brightest at the left third
+     and gone by the right — a single light source, not an even glow. */
+  .glass-edge::after {
+    content: none;
+  }
+
+  /* ---- Where the material is used ----
+     Applied by selector rather than by editing every component, so the
+     surface stays defined in one place.
+
+     These used to be glass — blur(24px) saturate(190%) on the sidebar, 28px
+     on the palette. It was removed on purpose. Blur costs a compositor pass
+     on every scroll to arrive at a milky white that could simply be
+     declared, and against a flat ground it refracts nothing: there was no
+     image beneath the sidebar for it to reveal. What separates chrome from
+     page here is a hairline and a shade, which is both cheaper and more
+     precise. */
+
+  /* The sidebar is deliberately absent from this list. It carries its own
+     deep-blue material now (see `.side`), and an `aside.glass-nav` rule
+     outranks a plain `.side` one on specificity — so leaving it here painted
+     the panel white again from three hundred lines away. */
+  header.glass-nav,
+  nav.glass-nav {
+    background: var(--surface);
+  }
+
+  /* The palette and the bulk bar DO float above the page, so they keep a
+     shadow — but an opaque surface, not a translucent one. */
+  .cmdk,
+  .bulkbar {
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* The scrim simply dims. It used to carry an accent bloom so the page read
+     as "lit through glass"; with the glass gone that was a coloured haze
+     with nothing to explain it. */
+  .cmdk-scrim,
+  .ws-scrim {
+    background: rgba(14, 17, 22, 0.42);
+  }
+
+  .ws-detail > div:first-child,
+  .ws-detail > div:last-child {
+    background: var(--surface);
+  }
+
+  /* ---- Fallback ----
+     Safari on older iOS and any browser with backdrop-filter disabled gets an
+     opaque panel instead. Without this the chrome would be a transparent
+     sheet with text on both sides of it. */
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass,
+    .glass-strong,
+    .cmdk,
+    .bulkbar,
+    header.glass-nav,
+    nav.glass-nav {
+      background: var(--surface);
+    }
+  }
+}
+
+/* ==========================================================================
+   AURA GLASS (content surfaces)
+   `.glass` is chrome glass: it blurs whatever scrolls beneath it. A card does
+   not sit over moving content — it sits on the page ground — so blurring there
+   costs legibility and buys nothing but GPU time.
+
+   `.aura-glass` is the card-weight version of the same material: an
+   accent-tinted surface, a lit top edge, and a border that carries a trace of
+   the brand hue. It reads as glass without pretending to refract anything.
+   ========================================================================== */
+
+@layer components {
+  /* The accent-tinted card is gone.
+     It was a gradient wash plus a lit edge plus a hue-shifted border on
+     every panel that used it, which meant "important" was said by tinting
+     the container rather than by anything inside it. A flat surface with a
+     hairline lets the content rank itself. */
+  .aura-glass {
+    background: var(--surface);
+    border-color: var(--rule);
+  }
+  .aura-glass:hover {
+    border-color: var(--rule-strong);
+  }
+
+  /* ---- Bucket-toned tab pill ----
+     Lifted out of the ARO panel so the engineer bench and the recovery
+     pipeline use one control rather than two that look almost alike. The
+     active pill takes its bucket's colour, which doubles as the legend for
+     the cards below it. */
+  .tone-tab {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-3);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard),
+      transform 0.16s var(--ease-out-quart);
+  }
+  .tone-tab:hover {
+    color: var(--ink-2);
+    border-color: var(--rule-strong);
+  }
+  .tone-tab:active {
+    transform: scale(0.975);
+  }
+  .tone-tab[data-on="true"] {
+    border-color: var(--tab-tone, var(--accent));
+    background: color-mix(in srgb, var(--tab-tone, var(--accent)) 10%, var(--surface));
+    color: var(--tab-tone, var(--accent));
+  }
+  .tone-tab-count {
+    display: grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .tone-tab[data-on="true"] .tone-tab-count {
+    background: var(--tab-tone, var(--accent));
+    color: var(--surface);
+  }
+}
+
+/* ==========================================================================
+   AURA GRADIENT BUTTONS
+   One ramp, defined once, used by every filled control (buttons, both FABs).
+
+   Design note, because this goes against the grain of the references:
+   Linear, Vercel and Stripe all ship FLAT primary buttons — Linear's don'ts
+   say "no atmospheric gradients", Vercel's mesh is hero-only and "never
+   miniaturised to a swatch", Stripe's indigo is a flat CTA colour. Gradient on
+   a control is normally a downgrade.
+
+   What keeps this one on the right side of that line is contrast: the two
+   stops are one step apart on the same ramp (--accent-2 → --accent), so it
+   reads as light raking across a solid rather than as a colour transition.
+   A wide-gamut ramp (violet → pink, say) is what makes a button look cheap.
+
+   Three states, and the press state is the point:
+     rest   ramp + a specular sheen down the top half
+     hover  ramp shifts one step brighter, shadow blooms
+     press  ramp COLLAPSES to flat and the shadow inverts — the light stops
+            raking because the surface has gone down. That is the physical
+            cue a flat button cannot give you, and the reason to have a
+            gradient here at all.
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* Angle is shared with the FABs and the aura-glass surfaces so every lit
+       thing on the page agrees where the light is. */
+    --grad-accent: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 72%);
+    --grad-accent-hot: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent-2) 86%, #fff) 0%,
+      var(--accent-2) 74%
+    );
+    --grad-ok: linear-gradient(
+      135deg,
+      var(--ok) 0%,
+      color-mix(in srgb, var(--ok) 84%, #062f22) 100%
+    );
+    /* Hover flattens the ramp rather than lightening past the base — the
+       button reads brighter without the label losing contrast. */
+    --grad-ok-hot: linear-gradient(
+      135deg,
+      var(--ok) 0%,
+      color-mix(in srgb, var(--ok) 94%, #062f22) 100%
+    );
+    /* The specular pass. Sits above the ramp, fades out by the midline so the
+       bottom half stays saturated. */
+    --btn-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0) 48%);
+    /* A ghost button is near-white; a white sheen on it is invisible, so it
+       gets a downward surface ramp instead. */
+    --grad-ghost: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+  }}
+
+@layer components {
+  /* ---- Primary ---- */
+  .btn-primary {
+    background-color: var(--accent);
+    background-image: var(--btn-sheen), var(--grad-accent);
+    color: var(--on-accent);
+    border-color: transparent;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 1px 2px color-mix(in srgb, var(--accent) 34%, transparent),
+      0 2px 8px -2px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  /* No sheen, no coloured glow. A press darkens; that is the whole state. */
+  .btn-primary:hover:not(:disabled) {
+    background-image: none;
+    background-color: var(--accent-2);
+    box-shadow: none;
+  }
+  .btn-primary:active:not(:disabled) {
+    background-image: none;
+    background-color: var(--accent-ink);
+    box-shadow: none;
+  }
+
+  /* ---- Success ---- */
+  .btn-ok {
+    background-color: var(--ok);
+    background-image: var(--btn-sheen), var(--grad-ok);
+    color: #fff;
+    border-color: transparent;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 1px 2px color-mix(in srgb, var(--ok) 32%, transparent),
+      0 2px 8px -2px color-mix(in srgb, var(--ok) 28%, transparent);
+  }
+  .btn-ok:hover:not(:disabled) {
+    background-image: var(--btn-sheen), var(--grad-ok-hot);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      0 6px 16px -4px color-mix(in srgb, var(--ok) 40%, transparent);
+  }
+  .btn-ok:active:not(:disabled) {
+    background-image: none;
+    background-color: var(--ok);
+    box-shadow: inset 0 1px 3px color-mix(in srgb, #000 26%, transparent);
+  }
+  /* ---- Ghost ----
+     Stays uncoloured: this is the secondary action, and giving it the brand
+     ramp would put two equally loud buttons in every row. It gets the same
+     lit *treatment* at neutral saturation so it belongs to the family. */
+  .btn-ghost {
+    background-color: var(--surface);
+    background-image: var(--grad-ghost);
+    color: var(--ink);
+    border-color: var(--rule);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      var(--shadow-xs);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background-image: none;
+    background-color: var(--surface-2);
+    border-color: var(--rule-strong);
+  }
+  .btn-ghost:active:not(:disabled) {
+    background-image: none;
+    background-color: var(--surface-3);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.07);
+  }
+  /* ---- Danger ----
+     Deliberately NOT a filled gradient. A destructive action rendered as the
+     loudest, most attractive object on screen invites the click it should be
+     discouraging, so it keeps the soft tonal treatment and gains the ramp only
+     on hover — once the pointer is already committed to it. */
+  .btn-danger {
+    background-color: var(--bad-soft);
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bad) 4%, transparent),
+      transparent 70%
+    );
+    color: var(--bad);
+    border-color: color-mix(in srgb, var(--bad) 24%, transparent);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--bad) 14%, var(--surface));
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--bad) 20%, var(--surface)) 0%,
+      color-mix(in srgb, var(--bad) 12%, var(--surface)) 72%
+    );
+    border-color: color-mix(in srgb, var(--bad) 38%, transparent);
+  }
+  .btn-danger:active:not(:disabled) {
+    background-image: none;
+    box-shadow: inset 0 1px 3px color-mix(in srgb, var(--bad) 22%, transparent);
+  }
+
+  /* ---- Standalone gradient button + both FABs ----
+     Pointed at the same tokens so there is one ramp in the system rather than
+     four hand-rolled ones drifting apart. */
+  .btn-gradient,
+  .fab,
+  .fab-ext {
+    background-color: var(--accent);
+    background-image: var(--btn-sheen), var(--grad-accent);
+    color: var(--on-accent);
+  }
+  .btn-gradient:hover:not(:disabled),
+  .fab:hover,
+  .fab-ext:hover {
+    background-image: none;
+    background-color: var(--accent-2);
+  }
+  .btn-gradient:active:not(:disabled),
+  .fab:active,
+  .fab-ext:active {
+    background-image: none;
+    background-color: var(--accent-ink);
+  }
+
+  /* Disabled controls lose the lighting entirely — a lit surface reads as
+     available, which is the opposite of what disabled means. */
+  .btn:disabled {
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+}
+

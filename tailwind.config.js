@@ -21,12 +21,21 @@ module.exports = {
         accent: "var(--accent)",
         "accent-2": "var(--accent-2)",
         "accent-soft": "var(--accent-soft)",
+        "accent-line": "var(--accent-line)",
         ok: "var(--ok)",
         "ok-soft": "var(--ok-soft)",
+        "ok-line": "var(--ok-line)",
+        // Text sitting ON a tint. The solid colour is too light against its
+        // own tint to pass AA — see the tint note in globals.css.
+        "ok-ink": "var(--ok-ink)",
         warn: "var(--warn)",
         "warn-soft": "var(--warn-soft)",
+        "warn-line": "var(--warn-line)",
+        "warn-ink": "var(--warn-ink)",
         bad: "var(--bad)",
         "bad-soft": "var(--bad-soft)",
+        "bad-line": "var(--bad-line)",
+        "bad-ink": "var(--bad-ink)",
       },
       boxShadow: {
         card: "var(--shadow-sm)",

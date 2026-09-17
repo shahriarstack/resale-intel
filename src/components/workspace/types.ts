@@ -60,6 +60,11 @@ export interface SavedView {
   sla: SlaLevel[];
   /** Restrict to these letter stages; empty means all. */
   letters: LetterStage[];
+  /** Restrict to these territory names; empty means all. */
+  territories: string[];
+  /** Capture window, YYYY-MM-DD. Empty string means unbounded on that end. */
+  from: string;
+  to: string;
   sortKey: SortKey;
   sortDir: SortDir;
   /** Built-in views ship with the app and cannot be deleted or renamed. */
@@ -70,6 +75,9 @@ export interface FilterState {
   search: string;
   sla: SlaLevel[];
   letters: LetterStage[];
+  territories: string[];
+  from: string;
+  to: string;
   sortKey: SortKey;
   sortDir: SortDir;
 }
@@ -78,9 +86,28 @@ export const EMPTY_FILTER: FilterState = {
   search: "",
   sla: [],
   letters: [],
+  territories: [],
+  from: "",
+  to: "",
   sortKey: "sla",
   sortDir: "desc",
 };
+
+/**
+ * Apply a saved view's shape over the current filter.
+ *
+ * Views saved before territory and date existed have neither key, so each is
+ * defaulted rather than read straight through — an older view must not come
+ * back as `undefined` and crash the list it is meant to narrow.
+ */
+export function normaliseView(v: SavedView): SavedView {
+  return {
+    ...v,
+    territories: v.territories ?? [],
+    from: v.from ?? "",
+    to: v.to ?? "",
+  };
+}
 
 /**
  * Views every desk gets for free. "Needs attention" is the one that earns its
@@ -93,6 +120,9 @@ export const BUILTIN_VIEWS: SavedView[] = [
     search: "",
     sla: [],
     letters: [],
+    territories: [],
+    from: "",
+    to: "",
     sortKey: "sla",
     sortDir: "desc",
     builtin: true,
@@ -103,6 +133,9 @@ export const BUILTIN_VIEWS: SavedView[] = [
     search: "",
     sla: ["risk", "breach"],
     letters: [],
+    territories: [],
+    from: "",
+    to: "",
     sortKey: "sla",
     sortDir: "desc",
     builtin: true,
@@ -113,6 +146,9 @@ export const BUILTIN_VIEWS: SavedView[] = [
     search: "",
     sla: [],
     letters: [],
+    territories: [],
+    from: "",
+    to: "",
     sortKey: "date",
     sortDir: "desc",
     builtin: true,
@@ -120,12 +156,16 @@ export const BUILTIN_VIEWS: SavedView[] = [
 ];
 
 export function viewToFilter(v: SavedView): FilterState {
+  const n = normaliseView(v);
   return {
-    search: v.search,
-    sla: v.sla,
-    letters: v.letters,
-    sortKey: v.sortKey,
-    sortDir: v.sortDir,
+    search: n.search,
+    sla: n.sla,
+    letters: n.letters,
+    territories: n.territories,
+    from: n.from,
+    to: n.to,
+    sortKey: n.sortKey,
+    sortDir: n.sortDir,
   };
 }
 
@@ -133,11 +173,15 @@ export function viewToFilter(v: SavedView): FilterState {
 export function filterMatchesView(f: FilterState, v: SavedView): boolean {
   const sameSet = (a: string[], b: string[]) =>
     a.length === b.length && [...a].sort().join() === [...b].sort().join();
+  const n = normaliseView(v);
   return (
-    f.search.trim() === v.search.trim() &&
-    sameSet(f.sla, v.sla) &&
-    sameSet(f.letters, v.letters) &&
-    f.sortKey === v.sortKey &&
-    f.sortDir === v.sortDir
+    f.search.trim() === n.search.trim() &&
+    sameSet(f.sla, n.sla) &&
+    sameSet(f.letters, n.letters) &&
+    sameSet(f.territories, n.territories) &&
+    f.from === n.from &&
+    f.to === n.to &&
+    f.sortKey === n.sortKey &&
+    f.sortDir === n.sortDir
   );
 }

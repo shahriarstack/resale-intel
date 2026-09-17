@@ -29,7 +29,7 @@ export function VehicleJourney({
   const j = buildJourney(status);
 
   return (
-    <section className={`card overflow-hidden ${className}`}>
+    <section className={`card min-w-0 overflow-hidden ${className}`}>
       {/* ---- header ---- */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-5 py-4">
         <h2 className="font-display text-[15px] font-bold text-ink">Journey</h2>
@@ -53,7 +53,10 @@ export function VehicleJourney({
       </div>
 
       {/* ---- rail ---- */}
-      <div className="overflow-x-auto px-5 py-6 no-scrollbar">
+      {/* `min-w-0` so this can shrink below the rail it holds. Without it the
+          scroller reports the rail's 620px as its own minimum and widens every
+          ancestor instead of scrolling. */}
+      <div className="min-w-0 overflow-x-auto px-5 py-6 no-scrollbar">
         <div className="flex min-w-[620px]">
           {j.steps.map((s, i) => (
             <RailNode
@@ -76,7 +79,7 @@ export function VehicleJourney({
             tone="bad"
             icon={<LogOut size={20} />}
             title="Released to the customer"
-            body="The vehicle left the pipeline before refurbishment. This is a terminal state — no desk is waiting on it."
+            body="The vehicle left the pipeline before refurbishment. This is a terminal state. No desk is waiting on it."
           />
         ) : j.isComplete ? (
           <Banner
@@ -136,7 +139,7 @@ function RailNode({
       className="flex flex-1 flex-col items-center"
       style={{
         opacity: dimmed ? 0.35 : 1,
-        animation: `fadeIn 0.3s ease ${index * 0.04}s both`,
+        animation: `fadeIn 0.3s var(--ease-standard) ${index * 0.04}s both`,
       }}
     >
       <div className="flex w-full items-center">
@@ -151,7 +154,7 @@ function RailNode({
         <span
           className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition-[background-color,border-color,color,box-shadow] duration-200"
           style={nodeStyle}
-          title={`${step.label} — ${step.heldBy === "—" ? "terminal" : step.heldBy}`}
+          title={`${step.label} · ${step.heldBy === "—" ? "terminal" : step.heldBy}`}
         >
           {done ? (
             <Check size={15} strokeWidth={3} />

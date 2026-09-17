@@ -6,6 +6,7 @@ import {
   Pencil,
   Trash2,
   Download,
+  Upload,
   Loader2,
   X,
   Users as UsersIcon,
@@ -16,8 +17,10 @@ import {
   ArrowDown,
   ArrowUpDown,
   AlertCircle,
+  KeyRound,
+  MapPinOff,
 } from "lucide-react";
-import type { Role } from "@prisma/client";
+import type { PostingKind, RecoveryPart, Role } from "@prisma/client";
 import { getJSON, sendJSON } from "@/lib/http";
 import { ALL_ROLES, ROLE_META } from "@/lib/rbac";
 import { Chip } from "@/components/ui/Chip";
@@ -25,6 +28,9 @@ import { CountUp } from "@/components/ui/CountUp";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
+import { UserImportDialog } from "@/components/admin/UserImportDialog";
+import { portalPairingError } from "@/lib/portals";
+import { postingError, postingLine, spentCovers } from "@/lib/postings";
 
 interface AdminUser {
   id: string;
@@ -33,12 +39,25 @@ interface AdminUser {
   designation: string | null;
   role: Role;
   isActive: boolean;
-  territoryId: string | null;
-  territory: { name: string } | null;
+  postings: {
+    kind: PostingKind;
+    territoryId: string;
+    territory: { name: string; part: RecoveryPart | null };
+  }[];
+  salesTerritory: string | null;
+  portalId: string | null;
+  portal: { id: string; name: string; isActive: boolean } | null;
 }
 interface Territory {
   id: string;
   name: string;
+}
+/** Only the two fields the picker needs — the composition lives at
+ *  /admin/portals and is not this form's business. */
+interface PortalOption {
+  id: string;
+  name: string;
+  isActive: boolean;
 }
 
 const blank = {
@@ -46,12 +65,32 @@ const blank = {
   staffId: "",
   designation: "",
   role: "RECOVERY_TEAM" as Role,
-  territoryId: "",
-  password: "",
+  territoryIds: [] as string[],
+  baseTerritoryId: "",
+  salesTerritory: "",
+  portalId: "",
   isActive: true,
 };
 
 type SortKey = "name" | "staffId" | "role" | "territory";
+
+/**
+ * The territory column, per role.
+ *
+ * Sales officers work a sales patch (`salesTerritory`); everyone else works a
+ * recovery Territory. They are different maps, so the column picks by role
+ * rather than falling back from one to the other — a fallback would print an
+ * ARO's recovery territory under a sales officer's name the moment someone
+ * changed a role, which is exactly the kind of wrong-but-plausible cell
+ * nobody catches.
+ */
+function territoryOf(u: AdminUser): string {
+  if (u.role === "SALES_TEAM") return u.salesTerritory?.trim() || "";
+  // "Dhaka North, covering Rajshahi" — one phrasing, shared with the coverage
+  // board and the capture-window console, so a posting reads the same wherever
+  // it appears.
+  return postingLine(u.postings);
+}
 type StatusFilter = "all" | "active" | "inactive";
 
 function initials(name: string): string {
@@ -67,6 +106,16 @@ export default function UsersAdminPage() {
   const { toast } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [territories, setTerritories] = useState<Territory[]>([]);
+  const [portals, setPortals] = useState<PortalOption[]>([]);
+  const [importing, setImporting] = useState(false);
+  // Every sales patch already in use, for the datalist. Derived from the user
+  // list rather than stored anywhere: the set of sales territories IS whatever
+  // the sales officers are assigned to, so there is nothing else to keep true.
+  const salesTerritories = useMemo(
+    () =>
+      [...new Set(users.map((u) => u.salesTerritory).filter(Boolean) as string[])].sort(),
+    [users],
+  );
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [open, setOpen] = useState(false);
@@ -83,12 +132,14 @@ export default function UsersAdminPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
-    const [u, t] = await Promise.all([
+    const [u, t, p] = await Promise.all([
       getJSON<AdminUser[]>("/api/admin/users"),
       getJSON<Territory[]>("/api/admin/territories"),
+      getJSON<PortalOption[]>("/api/admin/portals"),
     ]);
     setUsers(u);
     setTerritories(t);
+    setPortals(p);
     setLoading(false);
   };
 
@@ -96,13 +147,15 @@ export default function UsersAdminPage() {
     let active = true;
     (async () => {
       try {
-        const [u, t] = await Promise.all([
+        const [u, t, p] = await Promise.all([
           getJSON<AdminUser[]>("/api/admin/users"),
           getJSON<Territory[]>("/api/admin/territories"),
+          getJSON<PortalOption[]>("/api/admin/portals"),
         ]);
         if (active) {
           setUsers(u);
           setTerritories(t);
+          setPortals(p);
         }
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : "Failed to load");
@@ -133,6 +186,22 @@ export default function UsersAdminPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, saving]);
 
+  /**
+   * Covers that have done their job.
+   *
+   * The half of the arrangement nobody remembers. Picking up a vacant patch is
+   * a decision somebody makes deliberately; putting it down again is a thing
+   * that should have happened the week the new officer started, and until now
+   * there was nothing anywhere that would say so.
+   *
+   * Derived from the roster the page already has — the moment a territory gets
+   * an officer based in it, every cover on that territory becomes spent, on
+   * this screen, without anyone updating a second record. Nothing is revoked
+   * automatically: releasing somebody is a decision, and this only points at
+   * it.
+   */
+  const releasable = useMemo(() => spentCovers(users), [users]);
+
   const stats = useMemo(() => {
     const active = users.filter((u) => u.isActive).length;
     return {
@@ -159,7 +228,7 @@ export default function UsersAdminPage() {
           u.staffId.toLowerCase().includes(q) ||
           ROLE_META[u.role].label.toLowerCase().includes(q) ||
           (u.designation ?? "").toLowerCase().includes(q) ||
-          (u.territory?.name ?? "").toLowerCase().includes(q),
+          territoryOf(u).toLowerCase().includes(q),
       );
     }
 
@@ -176,7 +245,7 @@ export default function UsersAdminPage() {
           cmp = ROLE_META[a.role].label.localeCompare(ROLE_META[b.role].label);
           break;
         case "territory":
-          cmp = (a.territory?.name ?? "").localeCompare(b.territory?.name ?? "");
+          cmp = territoryOf(a).localeCompare(territoryOf(b));
           break;
       }
       return sortAsc ? cmp : -cmp;
@@ -204,18 +273,42 @@ export default function UsersAdminPage() {
       staffId: u.staffId,
       designation: u.designation ?? "",
       role: u.role,
-      territoryId: u.territoryId ?? "",
-      password: "",
+      territoryIds: u.postings.map((p) => p.territoryId),
+      baseTerritoryId: u.postings.find((p) => p.kind === "BASE")?.territoryId ?? "",
+      salesTerritory: u.salesTerritory ?? "",
+      portalId: u.portalId ?? "",
       isActive: u.isActive,
     });
     setError("");
     setOpen(true);
   };
 
-  const invalid =
-    !form.name.trim() || !form.staffId.trim() || (!editing && form.password.length < 6);
+  const invalid = !form.name.trim() || !form.staffId.trim();
 
   const save = async () => {
+    // An ARO is dedicated to a single territory. Without one their captures
+    // fall into the Unassigned row of the coverage table and no Recovery
+    // Manager sees them under either part.
+    // The same rule the API enforces, so the admin reads it before the round
+    // trip rather than after it — and it is the API's own message.
+    const posting = postingError(form.role, form.territoryIds, form.baseTerritoryId || null);
+    if (posting) {
+      setError(posting);
+      return;
+    }
+
+    // The same rule the API enforces, checked here so the admin reads it
+    // before the round trip rather than after it. The message is the API's
+    // own — one wording, one place.
+    const pairing = portalPairingError(
+      form.role,
+      form.role === "PORTAL_VIEWER" ? form.portalId || null : null,
+    );
+    if (pairing) {
+      setError(pairing);
+      return;
+    }
+
     setSaving(true);
     setError("");
     try {
@@ -224,15 +317,23 @@ export default function UsersAdminPage() {
         staffId: form.staffId,
         designation: form.designation,
         role: form.role,
-        territoryId: form.territoryId || null,
+        territoryIds: form.territoryIds,
+        baseTerritoryId: form.baseTerritoryId || null,
+        // Only ever sent for a sales officer. Changing someone's role away
+        // from sales clears it, so a stale patch name cannot linger on an
+        // engineer and turn up in the offer book.
+        salesTerritory: form.role === "SALES_TEAM" ? form.salesTerritory : "",
+        // Same argument as the sales patch above: sent as null for every other
+        // role, so moving somebody off a portal actually detaches them rather
+        // than leaving a lens attached to an account that no longer reads
+        // through one.
+        portalId: form.role === "PORTAL_VIEWER" ? form.portalId || null : null,
       };
       if (editing) {
         payload.isActive = form.isActive;
-        if (form.password) payload.password = form.password;
         await sendJSON(`/api/admin/users/${editing.id}`, "PATCH", payload);
         toast("User updated successfully");
       } else {
-        payload.password = form.password;
         await sendJSON("/api/admin/users", "POST", payload);
         toast("User created successfully");
       }
@@ -274,7 +375,7 @@ export default function UsersAdminPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-7 lg:px-8">
+    <div className="mx-auto w-full max-w-6xl px-6 py-7 lg:px-8">
       <header
         className="mb-5 flex flex-wrap items-end justify-between gap-4"
         style={{ animation: "fadeIn 0.24s var(--ease-standard)" }}
@@ -290,11 +391,47 @@ export default function UsersAdminPage() {
           <a href="/api/admin/export" className="btn btn-ghost">
             <Download size={16} /> Export register
           </a>
+          <button className="btn btn-ghost" onClick={() => setImporting(true)}>
+            <Upload size={16} /> Import CSV
+          </button>
           <button className="btn btn-primary" onClick={openCreate}>
             <Plus size={16} /> Add user
           </button>
         </div>
       </header>
+
+      {/* A cover whose vacancy has been filled. */}
+      {releasable.length > 0 && (
+        <section
+          className="mb-5 flex items-start gap-3 rounded-xl px-4 py-3.5"
+          style={{ background: "color-mix(in srgb, var(--warn) 9%, var(--surface))" }}
+        >
+          <span
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg"
+            style={{
+              background: "color-mix(in srgb, var(--warn) 16%, var(--surface))",
+              color: "var(--warn-ink)",
+            }}
+          >
+            <MapPinOff size={17} />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[13.5px] font-bold" style={{ color: "var(--warn-ink)" }}>
+              {releasable.length} cover{releasable.length === 1 ? "" : "s"} can be released
+            </div>
+            <ul className="mt-1 space-y-0.5">
+              {releasable.map((c) => (
+                <li key={`${c.officer.id}-${c.territoryId}`} className="text-[12px] text-ink-2">
+                  <strong className="font-semibold text-ink">{c.officer.name}</strong> is still
+                  covering <strong className="font-semibold text-ink">{c.territoryName}</strong>,
+                  which {c.basedOfficers.join(" and ")} {c.basedOfficers.length === 1 ? "is" : "are"}{" "}
+                  now posted to.
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {/* Stat strip */}
       <section
@@ -438,7 +575,7 @@ export default function UsersAdminPage() {
                         <td className="font-mono text-xs">{u.staffId}</td>
                         <td>{ROLE_META[u.role].label}</td>
                         <td className="text-ink-3">{u.designation || "—"}</td>
-                        <td className="text-ink-3">{u.territory?.name || "—"}</td>
+                        <td className="text-ink-3">{territoryOf(u) || "—"}</td>
                         <td>
                           {u.isActive ? <Chip tone="ok">Active</Chip> : <Chip tone="neutral">Inactive</Chip>}
                         </td>
@@ -479,6 +616,14 @@ export default function UsersAdminPage() {
             )}
           </div>
         </>
+      )}
+
+      {importing && (
+        <UserImportDialog
+          territories={territories}
+          onClose={() => setImporting(false)}
+          onDone={load}
+        />
       )}
 
       {/* Create / edit dialog */}
@@ -539,26 +684,158 @@ export default function UsersAdminPage() {
                     ))}
                   </select>
                   <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
+                    {/* Two roles carry no designations, and they are opposites
+                        — the Super Admin who can do everything and the portal
+                        viewer who can do nothing. The old fallback described
+                        the first and was shown for both, which on an access
+                        form is the worst possible place to be wrong. */}
                     {ROLE_META[form.role].designations !== "—"
                       ? `Typical designations: ${ROLE_META[form.role].designations}`
-                      : "Full system access."}
+                      : form.role === "PORTAL_VIEWER"
+                        ? "Reads through a portal and can act on nothing — no desk action in the system names this role."
+                        : "Full system access."}
                   </p>
                 </Labeled>
-                <Labeled label="Territory">
+                {/* Territories are a SET now, not a choice.
+                    A patch left unstaffed gets picked up by the officer next
+                    door, and the old single select could not say that — so the
+                    coverage board showed the vacancy as having nobody at all
+                    while somebody was in fact working it.
+
+                    Two controls, because there are two questions: which
+                    territories do they work, and which one is theirs. The
+                    second only appears once more than one is picked; with a
+                    single territory there is nothing to choose and the base is
+                    settled automatically. */}
+                <Labeled label={form.role === "RECOVERY_TEAM" ? "Territories *" : "Territories"}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {territories.map((t) => {
+                      const on = form.territoryIds.includes(t.id);
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className="po-chip"
+                          data-on={on || undefined}
+                          onClick={() => {
+                            const next = on
+                              ? form.territoryIds.filter((x) => x !== t.id)
+                              : [...form.territoryIds, t.id];
+                            setForm({
+                              ...form,
+                              territoryIds: next,
+                              // The first one picked is their base, and
+                              // dropping the base hands it to whatever is left
+                              // — so the pair is never in an impossible state
+                              // between two clicks.
+                              baseTerritoryId: next.includes(form.baseTerritoryId)
+                                ? form.baseTerritoryId
+                                : (next[0] ?? ""),
+                            });
+                          }}
+                        >
+                          {t.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {form.territoryIds.length > 1 && (
+                    <div className="mt-2.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+                        Based in
+                      </span>
+                      <select
+                        className="field mt-1"
+                        value={form.baseTerritoryId}
+                        onChange={(e) => setForm({ ...form, baseTerritoryId: e.target.value })}
+                      >
+                        {form.territoryIds.map((id) => (
+                          <option key={id} value={id}>
+                            {territories.find((t) => t.id === id)?.name ?? id}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
+                        The rest are recorded as <strong>cover</strong> — held while those patches
+                        have nobody of their own. The coverage board keeps showing them as vacant,
+                        which is what stops a stand-in becoming the permanent answer.
+                      </p>
+                    </div>
+                  )}
+
+                  {form.role === "RECOVERY_TEAM" && form.territoryIds.length <= 1 && (
+                    <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
+                      At least one. This is what puts their captures on the coverage table — pick a
+                      second if they are covering a patch nobody is posted to.
+                    </p>
+                  )}
+                </Labeled>
+              </div>
+
+              {/* Sales runs its own map, drawn differently from the recovery
+                  territories above, so it gets its own field rather than
+                  borrowing that list. Free text with suggestions from what is
+                  already in use: the admin types a name and moves on, and the
+                  datalist keeps the spelling consistent without anyone having
+                  to maintain a master list. */}
+              {form.role === "SALES_TEAM" && (
+                <Labeled label="Sales territory">
+                  <input
+                    className="field"
+                    list="sales-territories"
+                    value={form.salesTerritory}
+                    onChange={(e) => setForm({ ...form, salesTerritory: e.target.value })}
+                    placeholder="e.g. Dhaka Metro North"
+                    maxLength={80}
+                  />
+                  <datalist id="sales-territories">
+                    {salesTerritories.map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
+                  <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
+                    Shown beside this officer&rsquo;s name on every customer offer they bring in.
+                  </p>
+                </Labeled>
+              )}
+              {/* A portal viewer is defined by their portal — without one the
+                  account can sign in and see a title. The API refuses the
+                  pair, so this is required rather than optional. */}
+              {form.role === "PORTAL_VIEWER" && (
+                <Labeled label="Portal" required>
                   <select
                     className="field"
-                    value={form.territoryId}
-                    onChange={(e) => setForm({ ...form, territoryId: e.target.value })}
+                    value={form.portalId}
+                    onChange={(e) => setForm({ ...form, portalId: e.target.value })}
+                    required
                   >
-                    <option value="">None</option>
-                    {territories.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
+                    <option value="">Choose a portal</option>
+                    {portals.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                        {p.isActive ? "" : " (suspended)"}
                       </option>
                     ))}
                   </select>
+                  <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
+                    {portals.length === 0 ? (
+                      <>
+                        No portals exist yet. Compose one under{" "}
+                        <a className="underline" href="/admin/portals">
+                          Portals
+                        </a>{" "}
+                        first — it is what decides everything this account can see.
+                      </>
+                    ) : (
+                      <>
+                        This is the whole of their access. Everything they can open, see and read
+                        is composed on the portal, not here.
+                      </>
+                    )}
+                  </p>
                 </Labeled>
-              </div>
+              )}
               <Labeled label="Designation">
                 <input
                   className="field"
@@ -567,19 +844,38 @@ export default function UsersAdminPage() {
                   placeholder="e.g. Senior Manager"
                 />
               </Labeled>
-              <Labeled
-                label={editing ? "New password" : "Password"}
-                required={!editing}
-                hint={editing ? "Leave blank to keep the current password" : "At least 6 characters"}
-              >
-                <input
-                  className="field"
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder={editing ? "••••••••" : "At least 6 characters"}
-                />
-              </Labeled>
+              {/* No password field, because there is no password to choose.
+                  The Staff ID above IS the sign-in credential, and it is
+                  derived server-side from whatever that field ends up holding
+                  — so renaming somebody re-credentials them in the same save,
+                  and there is no way for the two to drift apart.
+
+                  Stated here and nowhere the signing-in user can read it: the
+                  admin needs to know what to tell a new officer; the login
+                  page deliberately does not say what the passcode is. */}
+              <div className="rounded-lg border border-rule bg-surface-2 px-3 py-2.5">
+                <div className="flex items-center gap-2 text-[12.5px] font-semibold text-ink">
+                  <KeyRound size={13} className="shrink-0 text-accent" />
+                  Sign-in credential
+                </div>
+                <p className="mt-1 text-[11px] leading-snug text-ink-3">
+                  {form.staffId.trim() ? (
+                    <>
+                      They sign in by choosing{" "}
+                      <span className="font-semibold text-ink-2">
+                        {ROLE_META[form.role].label}
+                      </span>{" "}
+                      and entering{" "}
+                      <span className="font-mono font-semibold text-ink-2">
+                        {form.staffId.trim()}
+                      </span>
+                      . Changing the Staff ID changes what they sign in with.
+                    </>
+                  ) : (
+                    "The Staff ID is what they sign in with, alongside their role. Enter one above."
+                  )}
+                </p>
+              </div>
               {editing && (
                 <label className="flex items-center gap-2.5 rounded-lg border border-rule bg-surface-2 px-3 py-2.5 text-sm text-ink-2">
                   <input
@@ -598,8 +894,8 @@ export default function UsersAdminPage() {
 
             {error && (
               <div
-                className="mt-4 flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-xs font-medium text-bad"
-                style={{ animation: "scaleIn 0.15s ease" }}
+                className="mt-4 flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-xs font-medium text-bad-ink"
+                style={{ animation: "scaleIn 0.15s var(--ease-spring)" }}
               >
                 <AlertCircle size={14} className="mt-px shrink-0" />
                 {error}

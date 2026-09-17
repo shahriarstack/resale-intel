@@ -1,4 +1,4 @@
-import { ok, fail, withGuard } from "@/lib/api";
+import { ok, fail, withGuard, assertMoved } from "@/lib/api";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { assessmentSchema } from "@/lib/validation";
@@ -7,9 +7,18 @@ import { recordEvent } from "@/lib/audit";
 import { isSafeStoredName } from "@/lib/storage";
 import { taka } from "@/lib/format";
 
-// Service Engineer cost analysis. Saves repair lines, transport/other cost and
-// assessment-sheet photos; `submit` runs SUBMIT_ASSESSMENT → COST_SUBMITTED.
-// Draft saves (submit:false) keep the file where it is so work isn't lost.
+/**
+ * Service Engineer cost analysis.
+ *
+ * Saves the quoted repair total, the transport and other costs, and the
+ * estimate sheets; `submit` runs SUBMIT_ASSESSMENT → COST_SUBMITTED. Draft
+ * saves (submit:false) keep the file where it is so work is not lost.
+ *
+ * Two things are required to submit, and only two: a repair figure, and at
+ * least one estimate sheet backing it. A number with no document behind it is
+ * an assertion; the document is what the Service Manager is actually
+ * approving against.
+ */
 export const POST = withGuard(
   async (request: Request, context: { params: Promise<{ id: string }> }) => {
     const user = await requireRole("SERVICE_ENGINEER");
@@ -38,38 +47,32 @@ export const POST = withGuard(
       if (!canRunAction(user.role, vehicle.status, "SUBMIT_ASSESSMENT")) {
         return fail("You cannot submit this assessment", 403);
       }
-      if (data.repairLines.length === 0) {
-        return fail("Add at least one repair cost line before submitting", 422);
-      }
       const existingSheets = await prisma.vehiclePhoto.count({
         where: { vehicleId: id, slot: "ASSESSMENT_SHEET", id: { notIn: data.removeSheetIds } },
       });
       if (existingSheets + data.newSheetNames.length === 0) {
-        return fail("Upload at least one assessment sheet before submitting", 422);
+        return fail("Upload the repair estimate sheet before submitting", 422);
       }
     }
 
-    const repairTotal = data.repairLines.reduce((s, l) => s + l.amount, 0);
-
     const result = await prisma.$transaction(async (tx) => {
-      // Replace repair lines with the submitted set.
-      await tx.repairCostLine.deleteMany({ where: { vehicleId: id } });
-      if (data.repairLines.length > 0) {
-        await tx.repairCostLine.createMany({
-          data: data.repairLines.map((l) => ({
-            vehicleId: id,
-            description: l.description,
-            amount: l.amount,
-            createdById: user.id,
-          })),
-        });
-      }
+      const note = data.repairNote?.trim() || null;
 
-      // Transport / other cost on the Costing row.
       await tx.costing.upsert({
         where: { vehicleId: id },
-        update: { transportCost: data.transportCost, otherCost: data.otherCost },
-        create: { vehicleId: id, transportCost: data.transportCost, otherCost: data.otherCost },
+        update: {
+          repairCost: data.repairCost,
+          repairNote: note,
+          transportCost: data.transportCost,
+          otherCost: data.otherCost,
+        },
+        create: {
+          vehicleId: id,
+          repairCost: data.repairCost,
+          repairNote: note,
+          transportCost: data.transportCost,
+          otherCost: data.otherCost,
+        },
       });
 
       // Remove any sheets the engineer deleted; add the new ones.
@@ -90,14 +93,20 @@ export const POST = withGuard(
       }
 
       if (data.submit) {
-        await tx.vehicle.update({ where: { id }, data: { status: "COST_SUBMITTED" } });
+        // Guarded on the status this submission was authorised against, so a
+        // resubmitted form cannot move the file a second time.
+        const moved = await tx.vehicle.updateMany({
+          where: { id, status: "CN_APPROVED" },
+          data: { status: "COST_SUBMITTED" },
+        });
+        assertMoved(moved.count);
         await recordEvent(tx, {
           vehicleId: id,
           actorId: user.id,
           type: "ASSESSMENT_SUBMITTED",
           fromStatus: "CN_APPROVED",
           toStatus: "COST_SUBMITTED",
-          note: `Repair estimate ${taka(repairTotal)}`,
+          note: `Repair estimate ${taka(data.repairCost)}${note ? ` — ${note}` : ""}`,
         });
       }
 

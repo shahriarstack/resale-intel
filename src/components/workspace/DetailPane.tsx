@@ -18,6 +18,7 @@ import { Chip } from "@/components/ui/Chip";
 import { STATUS_META, LETTER_META } from "@/lib/status";
 import { taka, shortDate, dateTime, timeAgo } from "@/lib/format";
 import { vehicleTitle, vehicleMake } from "@/lib/vehicle";
+import { AccountTitle } from "@/components/ui/AccountTitle";
 import { gradeSla } from "@/lib/sla";
 import { GRADE_META } from "@/lib/grades";
 import type { QuickAction, WorkspaceVehicle } from "./types";
@@ -63,7 +64,8 @@ interface VehicleDetail {
     sopCost: number;
     approvedPrice: number | null;
   } | null;
-  repairLines: CostLine[];
+  /** The engineer's quoted repair total. */
+  repairCost: number;
   regLines: CostLine[];
   photos: { id: string; url: string; slot: string }[];
   events: EventRow[];
@@ -111,7 +113,7 @@ export function DetailPane({
 
   const sla = gradeSla(vehicle.createdAt, data?.repairDeadline);
 
-  const repair = data?.repairLines.reduce((s, l) => s + l.amount, 0) ?? 0;
+  const repair = data?.repairCost ?? 0;
   const reg = data?.regLines.reduce((s, l) => s + l.amount, 0) ?? 0;
   const c = data?.costing;
   const total = repair + reg + (c ? c.transportCost + c.otherCost + c.sopCost : 0);
@@ -123,15 +125,19 @@ export function DetailPane({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="truncate font-display text-[19px] font-bold leading-tight tracking-tight text-ink">
-                {vehicleTitle(vehicle)}
-              </h2>
+              {/* The file is the customer's. The vehicle drops to the line
+                  below, beside the registration that identifies it. */}
+              <AccountTitle
+                record={vehicle}
+                as="h2"
+                className="font-display text-[19px] font-bold leading-tight tracking-tight text-ink"
+              />
               {data?.grade && (
                 <Chip tone={GRADE_META[data.grade].tone}>{data.grade}</Chip>
               )}
             </div>
             <p className="mt-0.5 truncate font-mono text-[11px] text-ink-3">
-              {vehicle.registrationNo}
+              {vehicle.registrationNo} · {vehicleTitle(vehicle)}
               {vehicleMake(vehicle) ? ` · ${vehicleMake(vehicle)}` : ""}
             </p>
           </div>
@@ -340,7 +346,7 @@ function humanEvent(e: EventRow): string {
     .replace(/_/g, " ")
     .replace(/^cn /, "CN ");
   if (e.field && e.oldValue && e.newValue) {
-    return `${verb} — ${e.field}: ${e.oldValue} to ${e.newValue}`;
+    return `${verb} · ${e.field}: ${e.oldValue} to ${e.newValue}`;
   }
-  return e.note ? `${verb} — ${e.note}` : verb;
+  return e.note ? `${verb}: ${e.note}` : verb;
 }

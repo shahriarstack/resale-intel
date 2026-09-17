@@ -1,0 +1,1397 @@
+/* ==========================================================================
+   HANDOVER & AS-IS
+   --------------------------------------------------------------------------
+   Two ends of one decision. Either the workshop spends the estimate and the
+   engineer photographs what it bought, or it does not and the vehicle sells on
+   the pictures taken the day it was recovered.
+
+   The visual argument runs the same way on every surface that touches it:
+   refurbished reads GREEN and forward, as-is reads AMBER and disclosed. Amber
+   is not a warning here — it is a disclosure. Nothing is wrong with an as-is
+   sale; it is simply a different thing to be told, and a buyer who is told it
+   clearly is not a buyer who complains later.
+   ========================================================================== */
+
+@layer components {
+  /* ---- The rebuild sheet ------------------------------------------------
+     Five rows, each a before and an after. The whole component is designed
+     around the fact that it is used one-handed, in a workshop, by someone who
+     has just put a spanner down: nothing here is a form, every tile is a
+     camera, and the sheet survives being abandoned half way. */
+
+  .ho-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+  }
+  .ho-count[data-done="true"] {
+    border-color: color-mix(in srgb, var(--ok) 30%, transparent);
+    background: var(--ok-soft);
+    color: var(--ok-ink);
+  }
+
+  /* Five segments, one per angle. The same five all the way down the screen,
+     so the count at the top and the rows below are obviously one thing. */
+  .ho-rail {
+    display: flex;
+    gap: 3px;
+  }
+  .ho-seg {
+    flex: 1 1 0;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--rule-strong);
+    transition: background-color 0.28s var(--ease-out-quart);
+  }
+  .ho-seg[data-on="true"] {
+    background: var(--ok);
+  }
+
+  .ho-lead {
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: var(--ink-2);
+  }
+
+  /* ---- The tile grid ----
+     Five tiles, not five stacked before/after rows. The rows were honest and
+     far too tall: a phone had to scroll a screen and a half to see what was
+     still owed, on a control whose entire job is to be finished quickly.
+
+     The pairing survives, shrunk to where it is actually needed — the
+     recovery shot sits as a small inset inside the empty tile, so the tile
+     still says "take THIS one again" without spending half the viewport
+     saying it. Once a tile is filled the inset goes: the reference has done
+     its job and the new photograph is the point. */
+
+  .ho-grid {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .ho-tile {
+    min-width: 0;
+  }
+
+  .ho-shot {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: var(--radius);
+    border: 1px dashed var(--rule-strong);
+    background: var(--surface-2);
+    cursor: pointer;
+    transition:
+      border-color 0.18s var(--ease-standard),
+      background-color 0.18s var(--ease-standard);
+  }
+  .ho-shot:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .ho-shot:disabled {
+    cursor: default;
+  }
+  .ho-shot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  /* A filled tile is a photograph, not a control: solid edge, no dashes. */
+  .ho-tile[data-filled="true"] .ho-shot {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--ok) 40%, var(--rule));
+  }
+  /* The next one owed is the only tile asking for anything. */
+  .ho-tile[data-next="true"] .ho-shot {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .ho-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .ho-tile[data-next="true"] .ho-overlay,
+  .ho-shot:hover:not(:disabled) .ho-overlay {
+    color: var(--accent);
+  }
+  .ho-shot[data-state="error"] .ho-overlay {
+    color: var(--bad);
+  }
+
+  /* The recovery shot, inset. Small enough to be a reference and never
+     mistaken for the photograph being asked for. */
+  .ho-before {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    width: 42%;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: var(--shadow-sm);
+    pointer-events: none;
+  }
+  .ho-before img {
+    filter: saturate(0.8);
+  }
+  .ho-before span {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 1px 0;
+    background: rgba(17, 17, 28, 0.62);
+    font-family: var(--font-mono);
+    font-size: 7px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+    color: #fff;
+  }
+
+  .ho-done-pip {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 999px;
+    background: var(--ok);
+    color: #fff;
+  }
+
+  .ho-tile-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 0 1px;
+  }
+  .ho-tile-name {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .ho-tile[data-filled="true"] .ho-tile-name {
+    color: var(--ok);
+  }
+  .ho-clear {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    flex: none;
+    border-radius: 4px;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: color 0.15s var(--ease-standard);
+  }
+  .ho-clear:hover {
+    color: var(--bad);
+  }
+
+  /* ---- The fast path ----
+     Most engineers walk round the truck shooting five, then want to hand all
+     five over in one move. This is that move, and it gets the emphasis
+     accordingly — the per-tile pickers below are the fallback, not the
+     headline. */
+  .ho-bulk {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--accent-line);
+    background: linear-gradient(
+      152deg,
+      color-mix(in srgb, var(--accent) 9%, var(--surface)),
+      var(--surface) 76%
+    );
+    cursor: pointer;
+    transition:
+      border-color 0.18s var(--ease-standard),
+      box-shadow 0.22s var(--ease-out-quart);
+  }
+  .ho-bulk:hover:not(:disabled) {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-sm);
+  }
+  .ho-bulk:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+  .ho-bulk-glyph {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: 10px;
+    color: #fff;
+    background: linear-gradient(150deg, var(--accent-2), var(--accent));
+  }
+  .ho-bulk-title {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+  }
+  .ho-bulk-sub {
+    display: block;
+    margin-top: 1px;
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--ink-3);
+  }
+
+  /* ---- The prompt on the bench card -------------------------------------
+     Not a warning. The engineer has not done anything wrong; there is simply
+     one more thing between them and closing the job, and this is the way to
+     it. So it is a link with a progress rail, not a red banner. */
+
+  .ho-prompt {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    border: 1px solid color-mix(in srgb, var(--cat-bench) 22%, var(--rule));
+    background: linear-gradient(
+      152deg,
+      color-mix(in srgb, var(--cat-bench) 8%, var(--surface)),
+      var(--surface) 76%
+    );
+    font-size: 12px;
+    color: var(--ink-2);
+    transition: border-color 0.18s var(--ease-standard);
+  }
+  .ho-prompt:hover {
+    border-color: color-mix(in srgb, var(--cat-bench) 45%, var(--rule));
+  }
+  .ho-prompt b {
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .ho-prompt-glyph {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 8px;
+    color: var(--cat-bench);
+    background: var(--cat-bench-soft);
+  }
+  .ho-prompt-sub {
+    display: block;
+    margin-top: 1px;
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--ink-3);
+  }
+  .ho-prompt-rail {
+    display: flex;
+    gap: 2px;
+    flex: none;
+  }
+  .ho-prompt-rail span {
+    width: 5px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--rule-strong);
+  }
+  .ho-prompt-rail span[data-on="true"] {
+    background: var(--cat-bench);
+  }
+
+  /* ---- The finish dialog ------------------------------------------------ */
+
+  .ho-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .ho-modal-title {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .ho-modal-sub {
+    margin-top: 1px;
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+  .ho-modal-body {
+    padding: 12px 14px 14px;
+    overflow-y: auto;
+  }
+  .ho-modal-body .ho-lead {
+    margin: 9px 0 11px;
+  }
+  .ho-modal-foot {
+    padding: 11px 14px 14px;
+    border-top: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+
+  /* ---- As-is, on the engineer's own card --------------------------------
+     Not a warning — nothing has gone wrong. It is a notice, and it is the
+     only thing on the card worth reading, so it sits above everything else
+     and the card asks for nothing underneath it. */
+
+  .asis-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 14px 10px;
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+  }
+  .asis-banner-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+  .asis-banner-body {
+    margin-top: 1px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--ink-2);
+  }
+
+  /* Ready, while photographs are outstanding, is a step rather than a stage:
+     it opens the finish dialog. Dashed says "not filed yet"; it is emphatically
+     not disabled, because it is the way forward. */
+  .stage-btn[data-opens="true"] {
+    border-style: dashed;
+    border-color: var(--accent-line);
+    color: var(--accent);
+  }
+
+  /* ---- The Service Manager's fork ---------------------------------------
+     Two routes, side by side, each with the money it commits printed on its
+     face. The decision is "spend this or do not", and showing one button with
+     the alternative hidden behind a link would have made one of those two
+     answers feel like the deviant one. */
+
+  .route-pick {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .route {
+    --rt: var(--accent);
+    position: relative;
+    display: block;
+    text-align: left;
+    padding: 9px 11px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    cursor: pointer;
+    transition:
+      border-color 0.18s var(--ease-standard),
+      background-color 0.18s var(--ease-standard),
+      box-shadow 0.2s var(--ease-out-quart);
+  }
+  .route[data-tone="warn"] {
+    --rt: var(--warn);
+  }
+  .route:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--rt) 40%, var(--rule));
+  }
+  .route[data-on="true"] {
+    border-color: color-mix(in srgb, var(--rt) 55%, transparent);
+    background: linear-gradient(
+      158deg,
+      color-mix(in srgb, var(--rt) 10%, var(--surface)),
+      var(--surface) 74%
+    );
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--rt) 28%, transparent);
+  }
+  .route:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .route-glyph {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    color: var(--rt);
+    background: color-mix(in srgb, var(--rt) 12%, var(--surface));
+  }
+  .route-name {
+    display: block;
+    margin-top: 7px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .route-money {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--rt);
+  }
+  .route-note {
+    display: block;
+    margin-top: 1px;
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+
+  /* What choosing as-is actually does, itemised. The manager is removing the
+     entire repair budget from a vehicle; the consequences should be on screen
+     before the button is pressed, not discoverable afterwards. */
+  .asis-effect {
+    border-radius: var(--radius);
+    border: 1px solid color-mix(in srgb, var(--warn) 22%, var(--rule));
+    background: color-mix(in srgb, var(--warn) 5%, var(--surface));
+    padding: 4px 11px;
+  }
+  .asis-effect li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--warn) 14%, transparent);
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--ink-2);
+  }
+  .asis-effect li:last-child {
+    border-bottom: 0;
+  }
+  .asis-effect b {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--warn);
+  }
+
+  .btn-warn {
+    background: var(--warn);
+    color: #fff;
+    border-color: transparent;
+  }
+  .btn-warn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--warn) 88%, #000);
+  }
+
+  /* ---- The shop window --------------------------------------------------
+     A photograph of a vehicle makes a claim about what the buyer will collect.
+     These two marks say which claim is being made. */
+
+  .sf-shotmark {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(17, 17, 28, 0.62);
+    backdrop-filter: blur(6px);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .sf-shotmark[data-tone="ok"] {
+    border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  }
+  .sf-shotmark[data-tone="warn"] {
+    border-color: color-mix(in srgb, var(--warn) 60%, transparent);
+  }
+
+  .sf-chipmark {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(17, 17, 28, 0.6);
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .sf-chipmark[data-tone="warn"] {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 60%, transparent);
+  }
+
+  /* The disclosure. Sits ABOVE the condition grade, because it changes what
+     the grade means. */
+  .sf-asis {
+    border-radius: var(--radius);
+    border: 1px solid color-mix(in srgb, var(--warn) 26%, var(--rule));
+    background: color-mix(in srgb, var(--warn) 5%, var(--surface));
+    padding: 11px 12px 12px;
+  }
+  .sf-asis-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--warn);
+  }
+  .sf-asis-body {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ink-2);
+  }
+  .sf-asis-label {
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sf-asis-list {
+    margin-top: 5px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .sf-asis-list li {
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--warn) 20%, var(--rule));
+    background: var(--surface);
+    font-size: 11.5px;
+    color: var(--ink-2);
+  }
+}
+
+/* ==========================================================================
+   CAPTURE FORM — the two controls that are not plain fields
+   ========================================================================== */
+
+@layer components {
+  /* ---- Mileage, with an explicit "unreadable" answer --------------------
+     A blank odometer field cannot tell a broken instrument apart from an ARO
+     who did not look. N/A gets its own control so the record can say which. */
+  .mileage-row {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .mileage-row .field {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .na-chip {
+    flex: none;
+    padding: 0 11px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition:
+      background-color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .na-chip:hover {
+    border-color: var(--rule-strong);
+    color: var(--ink-2);
+  }
+  .na-chip[data-on="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .na-chip:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+
+  /* ---- The optional remarks photo ---------------------------------------
+     Sits beside its own explanation rather than in the angle grid below: it
+     is not a sixth required angle, and putting it in that grid would make it
+     look like one. */
+  .remark-shot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: var(--radius);
+    border: 1px dashed var(--rule-strong);
+    background: var(--surface-2);
+  }
+}
+
+/* ==========================================================================
+   DESK HISTORY — "approved history" and the registration validity board
+   --------------------------------------------------------------------------
+   Both share one shell: a quiet, collapsed-by-default card that sits under a
+   desk's queue rather than competing with it. The queue is "what needs me
+   now"; these answer "what did I already do" and "what still needs watching
+   later" — two different questions, one calm register, so neither reads as
+   an alert next to the live queue above it.
+   ========================================================================== */
+
+@layer components {
+  .dh-card {
+    margin-top: 14px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .dh-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 14px;
+    cursor: pointer;
+  }
+  .dh-toggle-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .dh-toggle-title svg {
+    color: var(--accent);
+  }
+  .dh-toggle-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+  .dh-toggle-meta svg {
+    transition: transform 0.2s var(--ease-standard);
+  }
+
+  .dh-body {
+    padding: 0 14px 14px;
+    border-top: 1px solid var(--rule);
+    animation: fadeIn 0.2s var(--ease-standard);
+  }
+
+  .dh-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding-top: 12px;
+  }
+  .dh-search {
+    flex: 1 1 220px;
+    min-width: 0;
+    height: 32px;
+  }
+
+  .dh-empty {
+    padding: 22px 4px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  .dh-table-wrap {
+    margin-top: 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+    overflow-x: auto;
+  }
+  /* A quieter dtable inside this card — the parent already carries a border
+     and a heading, so the table itself does not need its own sticky header
+     shadow competing for the same 200px of vertical space. */
+  .dh-table-wrap .dtable {
+    font-size: 12.5px;
+  }
+  .dh-table-wrap .dtable thead th {
+    position: static;
+    padding: 8px 12px;
+  }
+  .dh-table-wrap .dtable tbody td {
+    padding: 8px 12px;
+  }
+
+  .dh-vehicle {
+    display: block;
+    min-width: 0;
+  }
+  .dh-vehicle-name {
+    display: block;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 22ch;
+  }
+  .dh-vehicle:hover .dh-vehicle-name {
+    color: var(--accent);
+  }
+  .dh-vehicle-reg {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+  .dh-note {
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--ink-3);
+    max-width: 32ch;
+  }
+
+  /* ---- Registration validity ------------------------------------------- */
+
+  .rv-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding-top: 12px;
+  }
+  @media (min-width: 640px) {
+    .rv-stats {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  .rv-stat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+  .rv-stat-icon {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    border-radius: 7px;
+    color: var(--tint-accent-ink, var(--ink-2));
+  }
+  .rv-stat[data-tone="bad"] .rv-stat-icon {
+    color: var(--bad-ink);
+    background: var(--bad-soft);
+  }
+  .rv-stat[data-tone="warn"] .rv-stat-icon {
+    color: var(--warn-ink);
+    background: var(--warn-soft);
+  }
+  .rv-stat[data-tone="ok"] .rv-stat-icon {
+    color: var(--ok-ink);
+    background: var(--ok-soft);
+  }
+  .rv-stat[data-tone="neutral"] .rv-stat-icon {
+    color: var(--ink-3);
+    background: var(--surface-3);
+  }
+  .rv-stat-value {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .rv-stat-label {
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+
+  .rv-days {
+    font-weight: 500;
+    opacity: 0.85;
+  }
+
+  /* A sold row is out of scope, and looks it — the same treatment the field
+     roster on the repair board uses for a live-nothing row. */
+  tr[data-dim="true"] {
+    opacity: 0.6;
+  }
+
+  /* ---- The inline status editor ----
+     Was a single-line "pick a number of days" strip. It now carries the cost
+     lines too, so it is a small stacked form rather than one row of controls
+     — the estimate is the reason Registration came back to the vehicle, and
+     sending them to another page to change it made "Update" a half-truth. */
+  .rv-edit-row td {
+    padding: 12px !important;
+    background: var(--accent-soft);
+  }
+  .rv-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .rv-edit-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .rv-edit-suggest {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .rv-edit-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+    padding-top: 10px;
+    border-top: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .rv-edit-label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+  }
+  /* The shared cost editor sits on a tinted ground here, so its inputs need a
+     solid one of their own to stay legible. */
+  .rv-edit .field {
+    background: var(--surface);
+  }
+}
+
+/* ==========================================================================
+   REGISTRATION COSTING — the shared validity-days picker and its call sites
+   ========================================================================== */
+
+@layer components {
+  .vdp {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .vdp-custom {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+}
+
+/* ==========================================================================
+   HAND-OFF RECEIPT
+   --------------------------------------------------------------------------
+   Shown when a desk finishes its part and passes the file on. Reads as a
+   docket torn off and handed over rather than as a success banner: the
+   figures just committed, printed back, above a perforated edge and the name
+   of whoever holds the file now.
+
+   The tick draws itself once, in about half a second. Long enough to register
+   as a thing that happened, short enough that nobody sitting through it forty
+   times a day starts resenting it — which is why it is a stroke animation and
+   not a bounce.
+   ========================================================================== */
+
+@layer components {
+  .hoff {
+    padding: 24px 20px 20px;
+    text-align: center;
+    --done-tone: var(--ok);
+    --done-soft: var(--ok-soft);
+  }
+  .hoff[data-tone="accent"] {
+    --done-tone: var(--accent);
+    --done-soft: var(--accent-soft);
+  }
+
+  /* ---- The mark ---- */
+  .hoff-mark {
+    display: grid;
+    place-items: center;
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: var(--done-soft);
+  }
+  .hoff-mark svg {
+    width: 40px;
+    height: 40px;
+    fill: none;
+    stroke: var(--done-tone);
+    stroke-width: 3.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .hoff-ring {
+    stroke-opacity: 0.28;
+    stroke-dasharray: 145;
+    stroke-dashoffset: 145;
+    animation: hoRing 0.5s var(--ease-out-quart) forwards;
+  }
+  .hoff-tick {
+    stroke-dasharray: 36;
+    stroke-dashoffset: 36;
+    animation: hoTick 0.34s var(--ease-out-quart) 0.26s forwards;
+  }
+  @keyframes hoRing {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes hoTick {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  /* The mark is confirmation of something that already happened; a reader who
+     has asked for less motion still gets the confirmation, just not the
+     drawing of it. */
+  @media (prefers-reduced-motion: reduce) {
+    .hoff-ring,
+    .hoff-tick {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* ---- Heading ---- */
+  .hoff-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .hoff-subject {
+    margin-top: 3px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+
+  /* ---- The receipt ----
+     Left-aligned inside a centred dialog on purpose: these are label/value
+     pairs and a centred column of them cannot be scanned. */
+  .hoff-receipt {
+    position: relative;
+    margin-top: 16px;
+    padding: 12px 14px 16px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    background: var(--surface-2);
+    text-align: left;
+  }
+  .hoff-fact {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+  .hoff-fact > span:last-child {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    text-align: right;
+  }
+  .hoff-fact[data-strong="true"] > span:last-child {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  /* The perforation. A row of notches bitten out of the bottom edge, so the
+     block reads as a docket that has just been torn off. */
+  .hoff-tear {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -6px;
+    height: 12px;
+    background:
+      radial-gradient(circle at 6px 6px, var(--surface) 5.5px, transparent 6px) repeat-x;
+    background-size: 12px 12px;
+  }
+
+  /* ---- Where it went ---- */
+  .hoff-next {
+    margin-top: 18px;
+    padding: 11px 12px;
+    border-radius: var(--radius);
+    border: 1px dashed color-mix(in srgb, var(--done-tone) 34%, var(--rule));
+    background: color-mix(in srgb, var(--done-tone) 5%, var(--surface));
+  }
+  .hoff-next-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .hoff-next-desk {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 2px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .hoff-next-desk svg {
+    color: var(--done-tone);
+  }
+  .hoff-next-action {
+    display: block;
+    margin-top: 1px;
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+
+  /* ---- The thank-you ----
+     Quiet on purpose. It is meant to be noticed and not performed at; a
+     bordered, tinted "WELL DONE!" panel would be the latter. */
+  .hoff-thanks {
+    margin-top: 14px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+    font-style: italic;
+  }
+}
+
+/* ===========================================================================
+   FIELD PANEL — premium surfaces
+   ===========================================================================
+
+   The officer's panel is built from white cards on a soft grey ground, with a
+   generous corner radius, a shadow you have to look for, and one deep indigo
+   block at the top.
+
+   Why the ground changed from white to grey: the panel used to be white cards
+   on a white page, so every card needed a visible border to exist at all, and
+   a screen full of hairline rectangles reads as a form rather than a product.
+   Tinting the page instead lets the cards be defined by being LIGHTER than
+   what is behind them — which is how paper works, needs no border, and leaves
+   the only strong lines on the page for things that mean something.
+
+   Colour is carried by the illustration plates rather than the cards. A tinted
+   card competes with the card next to it; a white card with a coloured plate
+   in the corner does not, and the plate is where the eye lands anyway.
+   =========================================================================== */
+
+@layer components {
+  /* The panel's ground. Scoped to a wrapper rather than applied to `body`,
+     because the desk consoles share that body and should stay white. */
+  .aro-page {
+    background: var(--aro-ground);
+    min-height: 100%;
+  }
+
+  .aro-card {
+    background: var(--surface);
+    border-radius: 18px;
+    box-shadow: var(--aro-shadow);
+    /* No border. The shadow and the ground do the separating; adding a
+       hairline on top of both is the belt-and-braces that made the old panel
+       look like a settings screen. */
+  }
+
+  /* A card you can press. The scale is small enough to feel like the surface
+     giving slightly rather than the card jumping. */
+  .aro-press {
+    transition:
+      transform 0.14s var(--ease-out-quart),
+      box-shadow 0.14s var(--ease-standard);
+  }
+  .aro-press:active {
+    transform: scale(0.985);
+    box-shadow: var(--aro-shadow-press);
+  }
+
+  /* Rows inside one card, divided rather than separated.
+     Four attention rows used to be four cards with four shadows and four sets
+     of margins — 40px of the screen spent on gaps between things that belong
+     together. One card, hairline divisions, same information, ~90px shorter. */
+  .aro-row + .aro-row {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* The plate an illustration sits on. `--tone` is the category's hue; the
+     plate is a soft mix of it so the drawing sits on its own colour family
+     rather than on grey. */
+  .aro-plate {
+    display: grid;
+    place-items: center;
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--tone, var(--accent)) 13%, var(--surface));
+  }
+
+  /* A count. Square-ish rather than a pill: at two digits a pill turns into a
+     lozenge and stops matching the plate on the other side of the row. */
+  .aro-count {
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--tone, var(--accent));
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Motion ----
+     Subtle throughout. The previous pass had illustrations breathing on a
+     six-second loop and urgent rows pulsing a ring; on a screen opened forty
+     times a day that stops being alive and becomes restless. What is left is
+     entrance and response: things arrive, and things answer when touched.
+     Nothing loops. */
+  .aro-rise > * {
+    animation: aroRise 0.42s var(--ease-out-quart) both;
+  }
+  .aro-rise > *:nth-child(1) {
+    animation-delay: 0.02s;
+  }
+  .aro-rise > *:nth-child(2) {
+    animation-delay: 0.06s;
+  }
+  .aro-rise > *:nth-child(3) {
+    animation-delay: 0.1s;
+  }
+  .aro-rise > *:nth-child(4) {
+    animation-delay: 0.14s;
+  }
+  .aro-rise > *:nth-child(5) {
+    animation-delay: 0.18s;
+  }
+  .aro-rise > *:nth-child(n + 6) {
+    animation-delay: 0.22s;
+  }
+}
+
+:root {
+  --aro-ground: #f4f5f7;
+  --aro-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 2px 6px -1px rgba(16, 24, 40, 0.06);
+  --aro-shadow-press: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+@keyframes aroRise {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Entrance is ornament. Someone who has asked the system to stop moving things
+   gets the final frame immediately. */
+@media (prefers-reduced-motion: reduce) {
+  .aro-rise > *,
+  .aro-press {
+    animation: none !important;
+    transition: none !important;
+  }
+  .aro-press:active {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The summary block
+   ---------------------------------------------------------------------------
+
+   One card, four figures, a blue → purple → green gradient that drifts.
+
+   The drift is the panel's only looping animation and it is deliberately at
+   the edge of perception: 18 seconds, and the stops move rather than the card.
+   Nothing reflows, nothing is measured against it, and if you look straight at
+   it you will not catch it moving — you notice it only after glancing away and
+   back, which is the difference between a surface that is alive and one that
+   is fidgeting.
+
+   Sized at 220% so there is somewhere for the stops to travel to. At 100% the
+   position animation has no effect at all, which is the usual reason this
+   technique looks broken.
+   ------------------------------------------------------------------------ */
+
+@layer components {
+  .aro-summary {
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+    color: #fff;
+    background-image: linear-gradient(
+      112deg,
+      #1d4ed8 0%,
+      #4338ca 26%,
+      #6d28d9 52%,
+      #0f766e 78%,
+      #00875a 100%
+    );
+    background-size: 220% 100%;
+    background-position: 0% 50%;
+    animation: aroDrift 18s ease-in-out infinite alternate;
+    box-shadow: 0 10px 26px -12px rgba(67, 56, 202, 0.6);
+  }
+
+  /* A single disc, painted into the gradient at full opacity — ink, not glass:
+     nothing behind the card shows through it. */
+  .aro-summary::after {
+    content: "";
+    position: absolute;
+    width: 190px;
+    height: 190px;
+    right: -66px;
+    top: -84px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 70%);
+    pointer-events: none;
+  }
+
+  /* One figure in the summary. Divided by hairlines rather than boxed: four
+     boxes on a coloured ground reads as a second card stack. */
+  .aro-cell {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+  }
+  .aro-cell + .aro-cell {
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    padding-left: 10px;
+  }
+  /* Resale inventory is a different KIND of number from the three beside it —
+     it is stock, not a recovery case — so the divider before it is heavier and
+     the cell is set slightly back. */
+  .aro-cell--apart {
+    border-left-width: 2px !important;
+    border-left-color: rgba(255, 255, 255, 0.38) !important;
+  }
+
+  /* ---- Attention ----
+     A count that wants answering. The badge breathes a soft halo out and
+     fades it — 2.6s, and only on rows that are genuinely late, so the movement
+     means "this one" rather than "this app has animations".
+
+     Scale is on the HALO, never the badge: growing the badge itself nudges the
+     text beside it, and a row that shifts while you are reading it is worse
+     than a row that does nothing. */
+  /* Built from box-shadow rather than a pseudo-element behind the badge.
+     The pseudo-element version was invisible: a `z-index: -1` child paints
+     behind the nearest stacking context's background, which here is the white
+     card — so the halo was rendering correctly and being covered up. A
+     box-shadow paints outside the border box and cannot be occluded by an
+     ancestor, so it works regardless of what stacking contexts appear above. */
+  .aro-alert {
+    animation: aroHalo 2.4s ease-out infinite;
+  }
+}
+
+@keyframes aroDrift {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes aroHalo {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aro-summary {
+    animation: none !important;
+    background-position: 30% 50%;
+  }
+  .aro-alert {
+    animation: none !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 28%, transparent);
+  }
+}
+

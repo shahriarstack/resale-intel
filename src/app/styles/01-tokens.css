@@ -1,0 +1,327 @@
+/* ==========================================================================
+   Resale Intel — design system
+   Light, minimal, enterprise. Petrol accent on cool blue-grey neutrals.
+   Barlow Condensed (display) · IBM Plex Sans (body) · IBM Plex Mono (data).
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* ====================================================================
+       NEUTRALS — ink on paper
+       A true neutral ramp, not a tinted one. The old greys carried a violet
+       cast from the accent, which meant every "grey" on screen was quietly
+       branded and nothing could read as genuinely neutral. A data product
+       needs a ground that recedes completely so the figures on it can be the
+       only thing with colour.
+       ==================================================================== */
+    --paper: #f5f6f7;
+    --surface: #ffffff;
+    --surface-2: #f0f1f3;
+    --surface-3: #e5e7ea;
+    --ink: #0e1116;
+    --ink-2: #4b5058;
+    --ink-3: #80868f;
+
+    /* Two rule weights and they do most of the structural work in this
+       system. Hairlines separate; shadows are reserved for things that
+       actually float. */
+    --rule: #e4e6e9;
+    --rule-strong: #cbcfd4;
+
+    --surface-alpha: rgba(255, 255, 255, 0.86);
+    --surface-alpha-strong: rgba(255, 255, 255, 0.96);
+
+    /* ====================================================================
+       ACCENT — one hue, spent sparingly
+       Deepened and desaturated from the previous #5546e0, which read
+       electric next to muted semantic colours. This is a considered indigo:
+       it holds contrast on white for text, and it is reserved for the
+       current thing, the primary action and the focus ring. It is never
+       decoration.
+       ==================================================================== */
+    --accent: #4a3fc7;
+    --accent-2: #5a4ee0;
+    --accent-ink: #382e9c;
+    --accent-soft: #dee3ff;
+    --accent-soft-2: #d6dbfe;
+    --accent-line: #bcc3f6;
+    --accent-ink-on-soft: #403f97;
+    --on-accent: #ffffff;
+
+    /* Kept for the brand wordmark only — the ACI green and a blue it steps
+       through. Not part of the UI palette and never used for a control. */
+    --brand-blue: #2f6fd0;
+    --brand-purple: #5a44c4;
+    --brand-green: #0f8f5c;
+
+    /* ====================================================================
+       SEMANTIC — one temperature
+       The accent is a cool indigo (OKLCH hue 279). The success jade sits at
+       161. Both are cool. The failure colour used to sit at hue 27 — an
+       orange-red — and that single fact is why the red never belonged: it was
+       lit from a different sun than everything around it.
+
+       It is now a GARNET at hue 16. Still unmistakably red, but carrying the
+       blue undertone that ties it to the indigo, which is the classic jewel
+       triad: indigo, jade, garnet.
+
+       The tints matter as much as the colours. A tint set is only a family if
+       its members share a lightness — the old red tint sat at luminance 0.796
+       against 0.836 and 0.854 for its siblings, so a red banner landed heavier
+       on the page than a violet or mint one and read as a thud rather than as
+       the same gesture in another colour. All three now sit together.
+       ==================================================================== */
+    /* Jade. Brighter and far more saturated than the forest green it
+       replaces — about 60% more luminous — while still clearing 4.55:1 against
+       the white text that sits on it. That figure is not incidental: it is the
+       ceiling. Every green brighter than this (including the stock Tailwind
+       greens) drops white text below the 4.5:1 an accessible button needs, so
+       this is the brightest premium jade the button can legitimately wear. */
+    --ok: #00875a;
+    --ok-soft: #ceeedc;
+    --ok-soft-2: #c3e8d4;
+    --ok-line: #9dd6b8;
+    --ok-ink: #006232;
+    /* Orange. Reverted from the mulberry that briefly held this slot — the
+       purple read as a different product next to the indigo, and a soft
+       lilac banner is not what "someone needs you" should feel like.
+
+       The ramp discipline is kept even though the hue went back: soft sits at
+       lightness 0.760, in line with the jade at 0.794 and the garnet at 0.771,
+       so a warn banner lands with the same weight as its siblings rather than
+       reading heavier or lighter than them. `ink` gives 6.28:1 on its own
+       tint, inside the 6.0-7.2 band the other two hold.
+
+       The known cost, stated plainly: an orange dark enough to carry white
+       text at 5.18:1 sits close to brown. That is a property of the sRGB gamut
+       at this lightness, not a choice — it is why the slot was ochre before,
+       and why it was moved to mulberry. If the brownness becomes the bigger
+       complaint again, the fix is a hue move, not another orange. */
+    --warn: #c2410c;
+    --warn-soft: #fbdccb;
+    --warn-soft-2: #f8d3bf;
+    --warn-line: #f0bb9a;
+    --warn-ink: #8f2f08;
+    --bad: #c42847;
+    --bad-soft: #ffdbdc;
+    --bad-soft-2: #fcd2d3;
+    --bad-line: #f2b4b7;
+    --bad-ink: #891f32;
+
+    /* ====================================================================
+       TINTS — four steps per hue, not one
+       Every semantic hue now carries the same four-part ramp the accent has
+       always had, because the asymmetry was visible: accent surfaces looked
+       considered and semantic ones looked washed.
+
+         soft / soft-2   the plane, and its gradient floor
+         line            a hairline IN the hue, so the edge is drawn not implied
+         ink             text sitting on that plane
+
+       Two measured problems drove it. First, the old tints sat at lightness
+       0.945 — LIGHTER than the 0.924 hairline they were bounded by, so a
+       tinted banner read as a bleached patch rather than a deliberate plane.
+       They now sit at 0.922, just under the rule, and carry nearly twice the
+       chroma: tinted glass instead of pastel paint.
+
+       Second, and not cosmetic: text on those tints was being set in the SOLID
+       colour, which gave 3.66:1 on jade and 4.39:1 on garnet — both under AA.
+       The `ink` step exists to fix that, and lands every hue between 6.0 and
+       7.2:1 on its own tint.
+
+       The gradient between soft and soft-2 is a two-percent drop. It is meant
+       to be felt rather than seen — enough that a filled surface reads as a
+       material with a top and a bottom, which is the difference between a
+       panel that looks placed and one that looks poured. */
+    --grad-tint-ok: linear-gradient(180deg, var(--ok-soft), var(--ok-soft-2));
+    --grad-tint-warn: linear-gradient(180deg, var(--warn-soft), var(--warn-soft-2));
+    --grad-tint-bad: linear-gradient(180deg, var(--bad-soft), var(--bad-soft-2));
+    --grad-tint-accent: linear-gradient(180deg, var(--accent-soft), var(--accent-soft-2));
+
+    --ring: rgba(74, 63, 199, 0.3);
+
+    /* ====================================================================
+       ELEVATION — rationed
+       Three steps, neutral rather than hue-tinted, and each one belongs to a
+       specific job. A card sitting on the page ground gets NO shadow: it is
+       not floating, and saying it is with a blur was the single biggest
+       reason the old surface stack read as generic.
+         sm  raised control (a menu, a sticky bar)
+         md  popover / dropdown
+         lg  modal, sheet, drawer — the only things truly off the page
+       ==================================================================== */
+    --shadow-sm: 0 1px 2px rgba(14, 17, 22, 0.06);
+    --shadow-md: 0 2px 4px rgba(14, 17, 22, 0.05), 0 8px 20px -6px rgba(14, 17, 22, 0.1);
+    --shadow-lg: 0 4px 10px rgba(14, 17, 22, 0.07), 0 24px 48px -16px rgba(14, 17, 22, 0.2);
+    /* Retired. Aliased rather than deleted so nothing breaks mid-migration;
+       both resolve to something quieter than they used to be. */
+    --shadow-xs: 0 1px 1px rgba(14, 17, 22, 0.04);
+    --shadow-xl: var(--shadow-lg);
+
+    /* ====================================================================
+       GEOMETRY — machined
+       Three steps, tighter than before. Large radii read consumer-friendly;
+       an instrument wants corners that look cut rather than moulded. The
+       old 18px is gone entirely.
+       ==================================================================== */
+    --radius-sm: 5px;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 12px;
+
+    /* ====================================================================
+       TYPE SCALE
+       The deepest fix in this pass. Sizes were previously invented per
+       component — twenty-odd values between 9 and 44px — which is why
+       nothing lined up across panels. One scale, named by role, and new
+       components pick from it instead of guessing.
+       ==================================================================== */
+    --t-micro: 9.5px;   /* mono labels, uppercase eyebrows */
+    --t-caption: 11px;  /* captions, table meta */
+    --t-sm: 12px;       /* dense table text, chips */
+    --t-body: 13px;     /* default UI text */
+    --t-md: 14px;       /* emphasised body, list titles */
+    --t-lg: 17px;       /* card and section headings */
+    --t-xl: 21px;       /* panel figures */
+    --t-2xl: 27px;      /* page titles */
+    --t-3xl: 34px;      /* the one display figure on a page, if any */
+
+    /* Tracking. Condensed display type needs negative tracking to stop
+       looking loose; mono labels need positive to stop looking cramped. */
+    --track-tight: -0.02em;
+    --track-display: -0.03em;
+    --track-label: 0.1em;
+
+    /* ====================================================================
+       SPACING — 4px base
+       ==================================================================== */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 20px;
+    --s-6: 24px;
+    --s-8: 32px;
+    --s-10: 40px;
+
+    /* San Francisco, asked for the only way it can legitimately be had.
+       `-apple-system` and `BlinkMacSystemFont` resolve to the real SF on macOS
+       and iOS, where it is already installed; the explicit "SF Pro" names catch
+       the designers who have it locally; Inter carries everyone else. SF is
+       never served from here, because its licence does not permit that.
+
+       Display and body differ only in which SF optical size they request —
+       Apple ships Display for large text and Text for small, and the system
+       picks correctly on its own. */
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro",
+      var(--font-inter), system-ui, "Segoe UI", sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro",
+      var(--font-inter), system-ui, "Segoe UI", sans-serif;
+    /* `ui-monospace` is SF Mono on Apple. Plex Mono stays as the fallback: this
+       product sets a great many figures in mono and needs real tabular digits
+       wherever it lands, which Consolas alone does not guarantee. */
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, var(--font-plex-mono),
+      Menlo, Consolas, monospace;
+
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --sidebar-w: 264px;
+    /* Height of the top bar the mobile shell pins over the page. Declared
+       once so the bar and anything that has to sit under it agree on it. */
+    /* The field shell's top bar. Only `.shell-bar` (mobile) reads this, and
+       `--shell-top` is derived from it — so anything that pins itself under
+       the bar, like the marketplace's filter rail, follows it down
+       automatically and the two cannot drift apart. */
+    --shell-bar-h: 50px;
+    /* And the fixed tab strip at the foot of it. The page reserves exactly
+       this much and no more: guessing high leaves visible dead ground under
+       the footer, which is the one thing that must not sit below it. */
+    /* The dock floats clear of the bottom edge, so a page has to reserve its
+       height PLUS the gap under it — otherwise the last row of a list sits
+       behind the glass. 49px of dock + 8px of gap + 7px of breathing room. */
+    --shell-tabs-h: 64px;
+  }
+
+  * {
+    border-color: var(--rule);
+  }
+
+  :root {
+    color-scheme: light;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: var(--paper);
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.005em;
+
+    /* Ambient background, three layers:
+       1. A fine grain, so the paper has tooth instead of reading as flat vector
+       2. A whisper of accent bloom at the top-right
+       3. A cool wash at the bottom-left
+       All far below conscious notice — you feel them, you don't see them. */
+    /* Flat. The ground had a noise layer and two radial blooms on it, none
+       of which the reader could name and all of which sat under every panel
+       adding tint. A precision instrument wants a ground that recedes
+       completely — the figures are the only thing meant to have colour. */
+    background-color: var(--paper);
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  input[type="number"],
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Kill the 300ms tap delay and double-tap zoom on controls. The field teams
+     work on phones, so this is felt on every button press. */
+  button,
+  a,
+  label,
+  select,
+  summary,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+  /* Set deliberately rather than inheriting the OS default grey flash. */
+  html {
+    -webkit-tap-highlight-color: rgba(85, 70, 224, 0.12);
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--rule-strong);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-3);
+  }
+}
+

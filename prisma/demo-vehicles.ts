@@ -54,33 +54,42 @@ interface Spec {
   deadlineIn?: number;
 }
 
+// One make, four load classes — the fleet ACI Motors actually finances.
+//
+// The class on each unit is not decoration: it is picked to agree with the
+// numbers beside it, because these rows are what every screenshot, demo and
+// manual test is read from. A 3-tonner carries the gearbox rebuilds, the
+// six-tyre bills and the top prices; a 1-tonner carries the light service
+// work and the bottom of the price range. A demo set where the biggest repair
+// bill sits on the smallest truck teaches whoever is reading it the wrong
+// thing about the business.
 const SPECS: Spec[] = [
-  { reg: "DEMO-DHA-11-2201", customer: "Rahim Traders", make: "Foton", model: "Aumark S", year: 2021, mileage: "48000", status: "CAPTURED", letter: "NONE", repair: [], registration: [], transport: 0, other: 0, sop: 0, idleDays: 1 },
-  { reg: "DEMO-DHA-11-2202", customer: "Karim Logistics", make: "Tata", model: "LPT 709", year: 2019, mileage: "92000", status: "CAPTURED", letter: "LETTER_1", repair: [], registration: [], transport: 0, other: 0, sop: 0, idleDays: 12 },
-  { reg: "DEMO-CTG-12-3303", customer: "Meghna Movers", make: "Ashok Leyland", model: "Dost", year: 2020, mileage: "61000", status: "CAPTURED", letter: "LETTER_2", repair: [], registration: [], transport: 0, other: 0, sop: 0, idleDays: 3 },
+  { reg: "DEMO-DHA-11-2201", customer: "Rahim Traders", make: "Foton", model: "1.5 TON AUMARK E", year: 2021, mileage: "48000", status: "CAPTURED", letter: "NONE", repair: [], registration: [], transport: 0, other: 0, sop: 0, idleDays: 1 },
+  { reg: "DEMO-DHA-11-2202", customer: "Karim Logistics", make: "Foton", model: "3 TON AUMARK E", year: 2019, mileage: "92000", status: "CAPTURED", letter: "LETTER_1", repair: [], registration: [], transport: 0, other: 0, sop: 0, idleDays: 12 },
+  { reg: "DEMO-CTG-12-3303", customer: "Meghna Movers", make: "Foton", model: "1 TON TM", year: 2020, mileage: "61000", status: "CAPTURED", letter: "LETTER_2", repair: [], registration: [], transport: 0, other: 0, sop: 0, idleDays: 3 },
 
-  { reg: "DEMO-DHA-13-4404", customer: "Padma Distribution", make: "Foton", model: "Ollin", year: 2018, mileage: "120000", status: "CN_REQUESTED", letter: "LETTER_3", locked: true, repair: [], registration: [], transport: 8000, other: 2500, sop: 0, idleDays: 9 },
-  { reg: "DEMO-SYL-14-5505", customer: "Surma Carriers", make: "Tata", model: "Ultra 1014", year: 2022, mileage: "31000", status: "CN_REQUESTED", letter: "LETTER_1", repair: [], registration: [], transport: 6500, other: 1200, sop: 0, idleDays: 2 },
+  { reg: "DEMO-DHA-13-4404", customer: "Padma Distribution", make: "Foton", model: "3 TON AUMARK E", year: 2018, mileage: "120000", status: "CN_REQUESTED", letter: "LETTER_3", locked: true, repair: [], registration: [], transport: 8000, other: 2500, sop: 0, idleDays: 9 },
+  { reg: "DEMO-SYL-14-5505", customer: "Surma Carriers", make: "Foton", model: "1.5 TON AUMARK E", year: 2022, mileage: "31000", status: "CN_REQUESTED", letter: "LETTER_1", repair: [], registration: [], transport: 6500, other: 1200, sop: 0, idleDays: 2 },
 
-  { reg: "DEMO-DHA-15-6606", customer: "Jamuna Freight", make: "Foton", model: "Aumark S", year: 2020, mileage: "74000", status: "CN_APPROVED", letter: "WRITTEN", locked: true, repair: [], registration: [], transport: 9000, other: 3000, sop: 0, idleDays: 5 },
+  { reg: "DEMO-DHA-15-6606", customer: "Jamuna Freight", make: "Foton", model: "1.5 TON AUMARK E", year: 2020, mileage: "74000", status: "CN_APPROVED", letter: "WRITTEN", locked: true, repair: [], registration: [], transport: 9000, other: 3000, sop: 0, idleDays: 5 },
 
-  { reg: "DEMO-RAJ-16-7707", customer: "Barind Agro", make: "Ashok Leyland", model: "Boss", year: 2019, mileage: "88000", status: "COST_SUBMITTED", letter: "LETTER_2", repair: [["Engine overhaul", 145000], ["Clutch assembly", 38000], ["Tyres (6)", 96000]], registration: [], transport: 12000, other: 4500, sop: 0, idleDays: 11 },
-  { reg: "DEMO-KHU-17-8808", customer: "Rupsha Transport", make: "Tata", model: "LPT 1109", year: 2017, mileage: "156000", status: "COST_SUBMITTED", letter: "LETTER_3", locked: true, repair: [["Gearbox rebuild", 118000], ["Body panel work", 52000]], registration: [], transport: 15000, other: 6000, sop: 0, idleDays: 4 },
+  { reg: "DEMO-RAJ-16-7707", customer: "Barind Agro", make: "Foton", model: "3 TON AUMARK E", year: 2019, mileage: "88000", status: "COST_SUBMITTED", letter: "LETTER_2", repair: [["Engine overhaul", 145000], ["Clutch assembly", 38000], ["Tyres (6)", 96000]], registration: [], transport: 12000, other: 4500, sop: 0, idleDays: 11 },
+  { reg: "DEMO-KHU-17-8808", customer: "Rupsha Transport", make: "Foton", model: "3 TON AUMARK E", year: 2017, mileage: "156000", status: "COST_SUBMITTED", letter: "LETTER_3", locked: true, repair: [["Gearbox rebuild", 118000], ["Body panel work", 52000]], registration: [], transport: 15000, other: 6000, sop: 0, idleDays: 4 },
 
-  { reg: "DEMO-DHA-18-9909", customer: "Turag Haulage", make: "Foton", model: "Ollin", year: 2021, mileage: "42000", status: "REPAIR_APPROVED", letter: "LETTER_1", repair: [["Suspension kit", 64000], ["Paint & finish", 41000]], registration: [], transport: 7500, other: 2200, sop: 0, idleDays: 16, deadlineIn: -6 },
-  { reg: "DEMO-CTG-19-1010", customer: "Karnaphuli Cargo", make: "Tata", model: "Ultra 1014", year: 2020, mileage: "67000", status: "REPAIR_APPROVED", letter: "NONE", repair: [["Brake system", 34000], ["AC & electricals", 27500]], registration: [], transport: 8800, other: 1900, sop: 0, idleDays: 3, deadlineIn: 9 },
+  { reg: "DEMO-DHA-18-9909", customer: "Turag Haulage", make: "Foton", model: "1.5 TON AUMARK E", year: 2021, mileage: "42000", status: "REPAIR_APPROVED", letter: "LETTER_1", repair: [["Suspension kit", 64000], ["Paint & finish", 41000]], registration: [], transport: 7500, other: 2200, sop: 0, idleDays: 16, deadlineIn: -6 },
+  { reg: "DEMO-CTG-19-1010", customer: "Karnaphuli Cargo", make: "Foton", model: "1.2 TON TM", year: 2020, mileage: "67000", status: "REPAIR_APPROVED", letter: "NONE", repair: [["Brake system", 34000], ["AC & electricals", 27500]], registration: [], transport: 8800, other: 1900, sop: 0, idleDays: 3, deadlineIn: 9 },
 
-  { reg: "DEMO-DHA-20-1111", customer: "Buriganga Lines", make: "Ashok Leyland", model: "Dost", year: 2019, mileage: "95000", status: "REGISTRATION_DONE", letter: "LETTER_2", repair: [["Full service", 58000]], registration: [["Fitness renewal", 14500], ["Tax token", 22000]], transport: 6200, other: 1500, sop: 0, idleDays: 8 },
+  { reg: "DEMO-DHA-20-1111", customer: "Buriganga Lines", make: "Foton", model: "1 TON TM", year: 2019, mileage: "95000", status: "REGISTRATION_DONE", letter: "LETTER_2", repair: [["Full service", 58000]], registration: [["Fitness renewal", 14500], ["Tax token", 22000]], transport: 6200, other: 1500, sop: 0, idleDays: 8 },
 
-  { reg: "DEMO-SYL-21-1212", customer: "Kushiyara Freight", make: "Foton", model: "Aumark S", year: 2022, mileage: "28000", status: "SOP_ADDED", letter: "NONE", grade: "A", repair: [["Minor touch-up", 19000]], registration: [["Fitness renewal", 14500]], transport: 5400, other: 900, sop: 35000, idleDays: 2 },
+  { reg: "DEMO-SYL-21-1212", customer: "Kushiyara Freight", make: "Foton", model: "1.5 TON AUMARK E", year: 2022, mileage: "28000", status: "SOP_ADDED", letter: "NONE", grade: "A", repair: [["Minor touch-up", 19000]], registration: [["Fitness renewal", 14500]], transport: 5400, other: 900, sop: 35000, idleDays: 2 },
 
-  { reg: "DEMO-DHA-22-1313", customer: "Shitalakshya Movers", make: "Tata", model: "LPT 709", year: 2020, mileage: "71000", status: "PRICE_APPROVED", letter: "LETTER_1", grade: "B", repair: [["Engine tune", 47000], ["Tyres (4)", 62000]], registration: [["Tax token", 22000]], transport: 7100, other: 2400, sop: 42000, price: 1_850_000, idleDays: 6 },
+  { reg: "DEMO-DHA-22-1313", customer: "Shitalakshya Movers", make: "Foton", model: "1.2 TON TM", year: 2020, mileage: "71000", status: "PRICE_APPROVED", letter: "LETTER_1", grade: "B", repair: [["Engine tune", 47000], ["Tyres (4)", 62000]], registration: [["Tax token", 22000]], transport: 7100, other: 2400, sop: 42000, price: 1_850_000, idleDays: 6 },
 
-  { reg: "DEMO-DHA-23-1414", customer: "Dhaleshwari Transport", make: "Foton", model: "Ollin", year: 2021, mileage: "39000", status: "LIVE_FOR_RESALE", letter: "NONE", grade: "A", repair: [["Full detailing", 31000]], registration: [["Fitness renewal", 14500], ["Tax token", 22000]], transport: 6800, other: 1600, sop: 38000, price: 2_260_000, idleDays: 4 },
-  { reg: "DEMO-CTG-24-1515", customer: "Sangu Carriers", make: "Tata", model: "Ultra 1014", year: 2020, mileage: "58000", status: "LIVE_FOR_RESALE", letter: "LETTER_1", grade: "B", repair: [["Gearbox service", 73000], ["Paint", 45000]], registration: [["Tax token", 22000]], transport: 9200, other: 3100, sop: 44000, price: 1_940_000, idleDays: 10 },
-  { reg: "DEMO-RAJ-25-1616", customer: "Padma Bulk", make: "Ashok Leyland", model: "Boss", year: 2018, mileage: "134000", status: "LIVE_FOR_RESALE", letter: "LETTER_2", grade: "C", repair: [["Engine overhaul", 162000], ["Chassis repair", 88000]], registration: [["Fitness renewal", 14500]], transport: 13500, other: 5200, sop: 51000, price: 1_420_000, idleDays: 21 },
+  { reg: "DEMO-DHA-23-1414", customer: "Dhaleshwari Transport", make: "Foton", model: "3 TON AUMARK E", year: 2021, mileage: "39000", status: "LIVE_FOR_RESALE", letter: "NONE", grade: "A", repair: [["Full detailing", 31000]], registration: [["Fitness renewal", 14500], ["Tax token", 22000]], transport: 6800, other: 1600, sop: 38000, price: 2_260_000, idleDays: 4 },
+  { reg: "DEMO-CTG-24-1515", customer: "Sangu Carriers", make: "Foton", model: "1.5 TON AUMARK E", year: 2020, mileage: "58000", status: "LIVE_FOR_RESALE", letter: "LETTER_1", grade: "B", repair: [["Gearbox service", 73000], ["Paint", 45000]], registration: [["Tax token", 22000]], transport: 9200, other: 3100, sop: 44000, price: 1_940_000, idleDays: 10 },
+  { reg: "DEMO-RAJ-25-1616", customer: "Padma Bulk", make: "Foton", model: "1 TON TM", year: 2018, mileage: "134000", status: "LIVE_FOR_RESALE", letter: "LETTER_2", grade: "C", repair: [["Engine overhaul", 162000], ["Chassis repair", 88000]], registration: [["Fitness renewal", 14500]], transport: 13500, other: 5200, sop: 51000, price: 1_420_000, idleDays: 21 },
 
-  { reg: "DEMO-KHU-26-1717", customer: "Mongla Freight", make: "Tata", model: "LPT 1109", year: 2016, mileage: "182000", status: "RELEASED", letter: "WRITTEN", locked: true, repair: [], registration: [], transport: 4200, other: 800, sop: 0, idleDays: 30 },
+  { reg: "DEMO-KHU-26-1717", customer: "Mongla Freight", make: "Foton", model: "3 TON AUMARK E", year: 2016, mileage: "182000", status: "RELEASED", letter: "WRITTEN", locked: true, repair: [], registration: [], transport: 4200, other: 800, sop: 0, idleDays: 30 },
 ];
 
 /** Write the placeholder shots for one vehicle and return their photo rows. */
@@ -122,7 +131,7 @@ async function clear() {
     }
   }
 
-  // Cost lines, answers, photos, bids and events cascade on vehicle delete.
+  // Cost lines, answers, photos, offers and events cascade on vehicle delete.
   await prisma.vehicle.deleteMany({ where: { registrationNo: { startsWith: PREFIX } } });
   console.log(`✓ removed ${rows.length} demo vehicles and ${files} placeholder images`);
 }
@@ -169,18 +178,15 @@ async function seed() {
           s.deadlineIn === undefined ? null : new Date(Date.now() + s.deadlineIn * DAY),
         costing: {
           create: {
+            // The engineer submits one figure against an uploaded estimate
+            // sheet, so the scripted breakdown becomes a total and a note.
+            repairCost: s.repair.reduce((sum, [, amount]) => sum + amount, 0),
+            repairNote: s.repair.map(([description]) => description).join("; ") || null,
             transportCost: s.transport,
             otherCost: s.other,
             sopCost: s.sop,
             approvedPrice: s.price ?? null,
           },
-        },
-        repairLines: {
-          create: s.repair.map(([description, amount]) => ({
-            description,
-            amount,
-            createdById: engineer.id,
-          })),
         },
         regLines: {
           create: s.registration.map(([description, amount]) => ({
@@ -230,19 +236,31 @@ async function seed() {
       select: { id: true },
     });
 
-    // A sealed bid or two on live stock, so the marketplace has a bid book.
+    // Two named customers on live stock, from the same officer — the normal
+    // case now that an offer belongs to a buyer rather than to the officer,
+    // and the one the storefront and the offer book both have to handle.
     if (s.status === "LIVE_FOR_RESALE" && s.price && sales) {
       const existing = await prisma.bid.count({ where: { vehicleId: vehicle.id } });
       if (existing === 0) {
-        await prisma.bid.create({
-          data: {
-            vehicleId: vehicle.id,
-            bidderId: sales.id,
-            amount: Math.round(s.price * 0.96),
-            note: "Demo bid — buyer viewing arranged.",
-          },
+        await prisma.bid.createMany({
+          data: [
+            {
+              vehicleId: vehicle.id,
+              bidderId: sales.id,
+              customerName: "Rahim Transport, Dhaka",
+              amount: Math.round(s.price * 0.96),
+              note: "Demo offer — buyer viewing arranged.",
+            },
+            {
+              vehicleId: vehicle.id,
+              bidderId: sales.id,
+              customerName: "Jashore Carriers",
+              amount: Math.round(s.price * 1.02),
+              note: "Demo offer — cash, collection within a week.",
+            },
+          ],
         });
-        bids++;
+        bids += 2;
       }
     }
 
@@ -255,7 +273,7 @@ async function seed() {
 
   console.log(`✓ ${made} demo vehicles across ${new Set(SPECS.map((s) => s.status)).size} statuses`);
   console.log(`✓ ${made * PHOTO_SLOTS.length} placeholder images in ${UPLOAD_DIR}`);
-  if (bids > 0) console.log(`✓ ${bids} demo bid${bids === 1 ? "" : "s"} from MO-01`);
+  if (bids > 0) console.log(`✓ ${bids} demo customer offer${bids === 1 ? "" : "s"} from MO-01`);
   console.log(`\nRemove them with:  npx tsx prisma/demo-vehicles.ts --clear`);
 }
 

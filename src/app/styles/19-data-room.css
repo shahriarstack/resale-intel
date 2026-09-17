@@ -1,0 +1,327 @@
+/* ===========================================================================
+   DATA ROOM — raw CSV by category, at /exports
+
+   Two halves: the picker on the left, the manifest on the right. The manifest
+   sticks, because the whole point of it is that it answers the filter you just
+   changed — a count that has scrolled off the screen is a count nobody reads.
+
+   It deliberately shares its shape with the Portal Studio (18-portals.css):
+   compose on the left, see the consequence on the right. Two admin surfaces
+   built a fortnight apart should not be two different interactions, and the
+   five desks that reach this page can already read the other one.
+   ======================================================================== */
+
+@layer components {
+  .dr-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  @media (min-width: 1024px) {
+    .dr-layout {
+      grid-template-columns: minmax(0, 1fr) 360px;
+      align-items: start;
+    }
+    .dr-manifest {
+      position: sticky;
+      top: 20px;
+    }
+  }
+
+  /* ---- The picker ---- */
+  .dr-pick {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .dr-band {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
+    overflow: hidden;
+  }
+  .dr-band-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+  .dr-band-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .dr-band-note {
+    margin-top: 2px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-3);
+  }
+  .dr-sets {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+  }
+  .dr-set {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    text-align: left;
+  }
+  .dr-set[data-on="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .dr-set-glyph {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    color: var(--ink-3);
+    background: var(--surface-2);
+  }
+  .dr-set[data-on="true"] .dr-set-glyph {
+    color: var(--on-accent);
+    background: var(--accent);
+  }
+  .dr-set-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .dr-set-q {
+    display: block;
+    margin-top: 1px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+  }
+  /* The rule the category encodes — what is in it and what is deliberately
+     left out. Only rendered on the selected row: on all eleven it is a wall of
+     text, and this is the moment the choice is actually being made. */
+  .dr-set-counts {
+    display: block;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--accent-line);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--accent-ink-on-soft);
+  }
+  .dr-tick {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 6px;
+    color: var(--on-accent);
+    background: transparent;
+  }
+  .dr-set[data-on="true"] .dr-tick {
+    background: var(--accent);
+  }
+
+  /* ---- The manifest ---- */
+  .dr-manifest {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .dr-count-block {
+    text-align: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .dr-count {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    font-family: var(--font-display);
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1;
+    /* Tabular, so the figure does not jump sideways as the count changes under
+       a filter someone is still typing. */
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+  .dr-count-bad {
+    color: var(--ink-3);
+  }
+  .dr-count-label {
+    margin-top: 5px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* ---- Filters ---- */
+  .dr-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .dr-filter {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .dr-filter-wide {
+    grid-column: 1 / -1;
+  }
+  .dr-filter-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .dr-clear {
+    grid-column: 1 / -1;
+    justify-self: start;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  /* ---- Columns ---- */
+  .dr-cols-head {
+    margin-bottom: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .dr-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .dr-chip {
+    padding: 2.5px 7px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-2);
+    background: var(--surface-2);
+  }
+  /* Withheld columns are struck, not dimmed — the same gesture the portal uses
+     for a masked lens, and for the same reason: a dimmed thing reads as
+     unimportant, a struck one as deliberately absent. */
+  .dr-chip-off {
+    color: var(--ink-3);
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--rule);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+  .dr-withheld-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 10px 0 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--warn-ink);
+  }
+
+  /* ---- Sample rows ---- */
+  .dr-sample-scroll {
+    /* min-width: 0 on the scroller, or it reports its content's min-content as
+       its own minimum and widens the column instead of scrolling. */
+    min-width: 0;
+    overflow-x: auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+  }
+  .dr-sample-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .dr-sample-table th {
+    padding: 5px 8px;
+    text-align: left;
+    white-space: nowrap;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    background: var(--surface-2);
+  }
+  .dr-sample-table td {
+    padding: 5px 8px;
+    border-top: 1px solid var(--rule);
+    white-space: nowrap;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--ink-2);
+  }
+  .dr-sample-note {
+    margin-top: 5px;
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+
+  /* ---- Taking it ---- */
+  .dr-filename {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.45;
+    text-align: center;
+    color: var(--ink-3);
+    /* A generated name is long and has no spaces, so it must be allowed to
+       break mid-token or it pushes the whole column wider. */
+    overflow-wrap: anywhere;
+  }
+  .dr-desk-note {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  .dr-manifest a[aria-disabled="true"] {
+    opacity: 0.5;
+  }
+
+  @media (max-width: 640px) {
+    .dr-filters {
+      grid-template-columns: 1fr;
+    }
+  }
+}
