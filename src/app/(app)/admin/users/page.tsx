@@ -61,6 +61,9 @@ interface PortalOption {
   isActive: boolean;
 }
 
+/** The add/edit form's shape, so the commit helper can be typed. */
+type FormState = typeof blank;
+
 const blank = {
   name: "",
   staffId: "",
@@ -80,6 +83,15 @@ const blank = {
   // answering "which patch, which part" is answering one question, and a
   // control that only exists once half of it is done reads as missing.
   pendingPart: "" as RecoveryPart | "",
+  // What is currently typed in the territory box.
+  //
+  // In state rather than left in an uncontrolled input, because the typed
+  // text IS a territory the moment somebody types it. Requiring Enter to
+  // "commit" it meant a form that plainly said Khulna could still be saved as
+  // having no territory at all, and the officer filling it in was told they
+  // had not entered one. Nobody should have to press a key to make what they
+  // can see be true.
+  territoryDraft: "",
   salesTerritory: "",
   portalId: "",
   isActive: true,
@@ -119,6 +131,35 @@ function territoryOf(u: AdminUser): string {
  * boundary, and the honest answer to "which part is this person" is the one
  * they belong to — the cover is visible in the Territory column beside it.
  */
+/**
+ * Fold whatever is typed in the territory box into the list of patches.
+ *
+ * The typed text is a territory. This is the only place that becomes true, so
+ * Enter, the add button and the save path all call it and none of them can
+ * disagree about what the form currently says.
+ *
+ * Returns the form unchanged when there is nothing to fold, so calling it
+ * twice — Enter and then save — cannot add a patch twice.
+ */
+function commitDraft(f: FormState): FormState {
+  const name = f.territoryDraft.trim();
+  if (!name) return f;
+  if (f.territoryNames.includes(name)) {
+    return { ...f, territoryDraft: "" };
+  }
+  const next = [...f.territoryNames, name];
+  return {
+    ...f,
+    territoryNames: next,
+    baseTerritoryName: f.baseTerritoryName || next[0],
+    territoryParts: { ...f.territoryParts, [name]: f.pendingPart },
+    // Cleared after use: the next patch is a fresh question, and carrying the
+    // last answer forward is how every officer ends up in part A.
+    pendingPart: "",
+    territoryDraft: "",
+  };
+}
+
 function partOf(u: AdminUser): "A" | "B" | null {
   if (u.role !== "RECOVERY_TEAM" && u.role !== "RECOVERY_MANAGER") return null;
   const base = u.postings.find((p) => p.kind === "BASE") ?? u.postings[0];
@@ -319,6 +360,7 @@ export default function UsersAdminPage() {
         u.postings.map((p) => [p.territory.name, p.territory.part ?? ""]),
       ),
       pendingPart: "" as RecoveryPart | "",
+      territoryDraft: "",
       salesTerritory: u.salesTerritory ?? "",
       portalId: u.portalId ?? "",
       isActive: u.isActive,
@@ -338,8 +380,14 @@ export default function UsersAdminPage() {
     // Part is required on the recovery desk, and the message names the patch
     // that is missing one rather than saying "part is required" over a form
     // holding three of them.
-    if (form.role === "RECOVERY_TEAM") {
-      const without = form.territoryNames.filter((n) => !form.territoryParts[n]);
+    // What is typed counts. Folded here rather than trusting that Enter was
+    // pressed — and folded into a LOCAL value, because setForm is async and
+    // validating `form` a line later would still read the pre-commit list.
+    const f = commitDraft(form);
+    if (f !== form) setForm(f);
+
+    if (f.role === "RECOVERY_TEAM") {
+      const without = f.territoryNames.filter((n) => !f.territoryParts[n]);
       if (without.length) {
         setError(
           without.length === 1
@@ -351,9 +399,9 @@ export default function UsersAdminPage() {
     }
 
     const posting = postingError(
-      form.role,
-      form.territoryNames,
-      form.baseTerritoryName || null,
+      f.role,
+      f.territoryNames,
+      f.baseTerritoryName || null,
     );
     if (posting) {
       setError(posting);
@@ -364,8 +412,8 @@ export default function UsersAdminPage() {
     // before the round trip rather than after it. The message is the API's
     // own — one wording, one place.
     const pairing = portalPairingError(
-      form.role,
-      form.role === "PORTAL_VIEWER" ? form.portalId || null : null,
+      f.role,
+      f.role === "PORTAL_VIEWER" ? f.portalId || null : null,
     );
     if (pairing) {
       setError(pairing);
@@ -375,29 +423,31 @@ export default function UsersAdminPage() {
     setSaving(true);
     setError("");
     try {
+      // `f`, not `form` — the folded copy, which is the only one that knows
+      // about a patch typed but never Entered.
       const payload: Record<string, unknown> = {
-        name: form.name,
-        staffId: form.staffId,
-        designation: form.designation,
-        role: form.role,
-        territoryNames: form.territoryNames,
-        baseTerritoryName: form.baseTerritoryName || null,
-        territoryParts: form.territoryNames.map((name) => ({
+        name: f.name,
+        staffId: f.staffId,
+        designation: f.designation,
+        role: f.role,
+        territoryNames: f.territoryNames,
+        baseTerritoryName: f.baseTerritoryName || null,
+        territoryParts: f.territoryNames.map((name) => ({
           name,
-          part: form.territoryParts[name] || null,
+          part: f.territoryParts[name] || null,
         })),
         // Only ever sent for a sales officer. Changing someone's role away
         // from sales clears it, so a stale patch name cannot linger on an
         // engineer and turn up in the offer book.
-        salesTerritory: form.role === "SALES_TEAM" ? form.salesTerritory : "",
+        salesTerritory: f.role === "SALES_TEAM" ? f.salesTerritory : "",
         // Same argument as the sales patch above: sent as null for every other
         // role, so moving somebody off a portal actually detaches them rather
         // than leaving a lens attached to an account that no longer reads
         // through one.
-        portalId: form.role === "PORTAL_VIEWER" ? form.portalId || null : null,
+        portalId: f.role === "PORTAL_VIEWER" ? f.portalId || null : null,
       };
       if (editing) {
-        payload.isActive = form.isActive;
+        payload.isActive = f.isActive;
         await sendJSON(`/api/admin/users/${editing.id}`, "PATCH", payload);
         toast("User updated successfully");
       } else {
@@ -852,30 +902,17 @@ export default function UsersAdminPage() {
                     <input
                       className="field min-w-0 flex-1"
                       placeholder="Type a territory…"
+                      value={form.territoryDraft}
+                      onChange={(e) =>
+                        setForm({ ...form, territoryDraft: e.target.value, })
+                      }
                       onKeyDown={(e) => {
+                        // Enter is a SHORTCUT for adding a second patch, not
+                        // the way a first one is entered. What is typed counts
+                        // whether or not this is ever pressed.
                         if (e.key !== "Enter") return;
                         e.preventDefault();
-                        const name = e.currentTarget.value.trim();
-                        if (!name) return;
-                        if (form.territoryNames.includes(name)) {
-                          e.currentTarget.value = "";
-                          return;
-                        }
-                        const next = [...form.territoryNames, name];
-                        setForm({
-                          ...form,
-                          territoryNames: next,
-                          baseTerritoryName: form.baseTerritoryName || next[0],
-                          territoryParts: {
-                            ...form.territoryParts,
-                            [name]: form.pendingPart,
-                          },
-                          // Cleared after use: the next patch is a fresh
-                          // question, and carrying the last answer forward is
-                          // how every officer ends up in part A.
-                          pendingPart: "",
-                        });
-                        e.currentTarget.value = "";
+                        setForm(commitDraft(form));
                       }}
                     />
                     {(["A", "B"] as const).map((part) => (
@@ -884,7 +921,7 @@ export default function UsersAdminPage() {
                         type="button"
                         className="po-chip shrink-0"
                         data-on={form.pendingPart === part || undefined}
-                        title={`Add the next patch as part ${part}`}
+                        title={`Part ${part}`}
                         onClick={() =>
                           setForm({
                             ...form,
@@ -896,6 +933,20 @@ export default function UsersAdminPage() {
                       </button>
                     ))}
                   </div>
+
+                  {/* The way to add a SECOND patch, for the rare officer who
+                      covers one. The first needs no button at all — what is
+                      typed is already the answer — so this only appears once
+                      there is something to add alongside. */}
+                  {form.territoryDraft.trim() !== "" && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm mt-1.5"
+                      onClick={() => setForm(commitDraft(form))}
+                    >
+                      <Plus size={13} /> Add another patch
+                    </button>
+                  )}
                   {/* Said before it is true, not after.
                       The Part control only exists once a patch does, which
                       made it invisible to anyone reading the empty form — they
@@ -904,10 +955,9 @@ export default function UsersAdminPage() {
                       line and removes the whole confusion. */}
                   {form.territoryNames.length === 0 && (
                     <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
-                      Pick <strong className="text-ink-2">A</strong> or{" "}
-                      <strong className="text-ink-2">B</strong>, then press{" "}
-                      <strong className="text-ink-2">Enter</strong> to add the patch. A patch
-                      that does not exist yet is created when you save.
+                      Type the patch and pick <strong className="text-ink-2">A</strong> or{" "}
+                      <strong className="text-ink-2">B</strong>. One that does not exist yet is
+                      created when you save.
                     </p>
                   )}
 
