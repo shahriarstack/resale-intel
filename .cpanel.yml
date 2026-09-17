@@ -3,6 +3,7 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/cvacimot/public_html/resale.cv-acimotors.com
     - source /home/cvacimot/nodevenv/public_html/resale.cv-acimotors.com/24/bin/activate
+    - cd /home/cvacimot/repositories/resale
     - npm install
     - npx prisma generate
     - npm run build
