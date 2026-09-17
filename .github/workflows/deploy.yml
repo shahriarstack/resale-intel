@@ -23,7 +23,10 @@ concurrency:
 env:
   APP_ROOT: /home/cvacimot/resale
   APP_ROOT_REL: resale
-  SITE_URL: http://resale.cv-acimotors.com
+  # https, not http. TLS is live on this domain, and the health check should
+  # exercise the scheme people actually use — a certificate that expires or
+  # stops being served is a site outage this step would otherwise miss.
+  SITE_URL: https://resale.cv-acimotors.com
 
 jobs:
   build-and-deploy:
