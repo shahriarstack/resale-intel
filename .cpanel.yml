@@ -2,7 +2,10 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/cvacimot/public_html/resale
-    - /bin/cp -R * $DEPLOYPATH
-    - /bin/cp -R .next $DEPLOYPATH
-    - mkdir -p $DEPLOYPATH/tmp
-    - touch $DEPLOYPATH/tmp/restart.txt
+    - /bin/cp -a * $DEPLOYPATH
+    - cd $DEPLOYPATH
+    - npm install --production=false
+    - npx prisma generate
+    - npm run build
+    - mkdir -p tmp
+    - touch tmp/restart.txt
