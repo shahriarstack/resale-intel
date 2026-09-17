@@ -54,7 +54,10 @@ export const POST = withGuard(async (request: Request) => {
   let territoryIds = data.territoryIds;
   let baseTerritoryId = data.baseTerritoryId;
   if (data.territoryNames) {
-    const resolved = await resolveTerritoryNames(data.territoryNames);
+    const partMap = new Map(
+      (data.territoryParts ?? []).map((t) => [t.name.toLowerCase(), t.part]),
+    );
+    const resolved = await resolveTerritoryNames(data.territoryNames, partMap);
     if ("error" in resolved) return fail(resolved.error, 422);
     territoryIds = resolved.ids;
     const baseName = data.baseTerritoryName?.trim();

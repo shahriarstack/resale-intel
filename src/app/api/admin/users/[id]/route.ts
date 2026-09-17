@@ -90,7 +90,10 @@ export const PATCH = withGuard(
     let namedIds: string[] | null = null;
     let namedBase: string | null = null;
     if (data.territoryNames !== undefined) {
-      const resolved = await resolveTerritoryNames(data.territoryNames);
+      const partMap = new Map(
+        (data.territoryParts ?? []).map((t) => [t.name.toLowerCase(), t.part]),
+      );
+      const resolved = await resolveTerritoryNames(data.territoryNames, partMap);
       if ("error" in resolved) return fail(resolved.error, 422);
       namedIds = resolved.ids;
       const baseName = data.baseTerritoryName?.trim();

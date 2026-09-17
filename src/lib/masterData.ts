@@ -89,6 +89,18 @@ export function emptyToNull(v: string | undefined | null): string | null {
  */
 export async function resolveTerritoryNames(
   names: string[],
+  /**
+   * Which half of the recovery organisation each patch belongs to, when the
+   * caller knows. Part is a property of the TERRITORY, not of the officer —
+   * two AROs posted to Dhaka South cannot disagree about which part it is in —
+   * so this writes it onto the row and a later posting that names a different
+   * part corrects it rather than forking it.
+   *
+   * Omitted, or given as null, the existing part is left alone. That matters
+   * on edit: an administrator changing an officer's patches should not blank
+   * the part somebody set deliberately.
+   */
+  parts?: Map<string, "A" | "B" | null>,
 ): Promise<{ ids: string[]; idByName: Map<string, string> } | { error: string }> {
   const wanted = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
   if (wanted.length === 0) return { ids: [], idByName: new Map() };
@@ -99,18 +111,34 @@ export async function resolveTerritoryNames(
 
   const existing = await prisma.territory.findMany({
     where: { name: { in: wanted } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, part: true },
   });
 
   // Keyed lower-case so the lookup folds case the same way the column does.
   const idByName = new Map<string, string>();
-  for (const t of existing) idByName.set(t.name.toLowerCase(), t.id);
+  const partOf = new Map<string, "A" | "B" | null>();
+  for (const t of existing) {
+    idByName.set(t.name.toLowerCase(), t.id);
+    partOf.set(t.name.toLowerCase(), t.part);
+  }
 
   for (const name of wanted) {
-    if (idByName.has(name.toLowerCase())) continue;
+    const wantPart = parts?.get(name.toLowerCase()) ?? null;
+
+    if (idByName.has(name.toLowerCase())) {
+      // Already a row. Only write when a part was actually supplied AND it
+      // differs — an update per save would churn the table for nothing.
+      if (wantPart && partOf.get(name.toLowerCase()) !== wantPart) {
+        await prisma.territory.update({
+          where: { id: idByName.get(name.toLowerCase())! },
+          data: { part: wantPart },
+        });
+      }
+      continue;
+    }
     try {
       const made = await prisma.territory.create({
-        data: { name },
+        data: { name, part: wantPart },
         select: { id: true, name: true },
       });
       idByName.set(made.name.toLowerCase(), made.id);

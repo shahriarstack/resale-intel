@@ -51,6 +51,7 @@ interface AdminUser {
 interface Territory {
   id: string;
   name: string;
+  part: RecoveryPart | null;
 }
 /** Only the two fields the picker needs — the composition lives at
  *  /admin/portals and is not this form's business. */
@@ -70,6 +71,10 @@ const blank = {
   // the first time has none yet. The API resolves these to rows.
   territoryNames: [] as string[],
   baseTerritoryName: "",
+  // Part per patch, keyed by name. A property of the territory rather than of
+  // this officer, so the control shows what the row already says and writing
+  // it corrects the row for everyone posted there.
+  territoryParts: {} as Record<string, RecoveryPart | "">,
   salesTerritory: "",
   portalId: "",
   isActive: true,
@@ -279,6 +284,9 @@ export default function UsersAdminPage() {
       territoryNames: u.postings.map((p) => p.territory.name),
       baseTerritoryName:
         u.postings.find((p) => p.kind === "BASE")?.territory.name ?? "",
+      territoryParts: Object.fromEntries(
+        u.postings.map((p) => [p.territory.name, p.territory.part ?? ""]),
+      ),
       salesTerritory: u.salesTerritory ?? "",
       portalId: u.portalId ?? "",
       isActive: u.isActive,
@@ -327,6 +335,10 @@ export default function UsersAdminPage() {
         role: form.role,
         territoryNames: form.territoryNames,
         baseTerritoryName: form.baseTerritoryName || null,
+        territoryParts: form.territoryNames.map((name) => ({
+          name,
+          part: form.territoryParts[name] || null,
+        })),
         // Only ever sent for a sales officer. Changing someone's role away
         // from sales clears it, so a stale patch name cannot linger on an
         // engineer and turn up in the offer book.
@@ -715,7 +727,14 @@ export default function UsersAdminPage() {
                     second only appears once more than one is picked; with a
                     single territory there is nothing to choose and the base is
                     settled automatically. */}
-                <Labeled label={form.role === "RECOVERY_TEAM" ? "Territories *" : "Territories"}>
+                {/* RECOVERY ONLY. A sales officer's patch is `salesTerritory`
+                    below — free text, a different organisation, and never the
+                    same list. A service engineer works a bench, not a map.
+                    Hidden rather than disabled, and the state is still sent, so
+                    switching somebody's role never silently drops postings
+                    somebody set on purpose. */}
+                {form.role === "RECOVERY_TEAM" && (
+                <Labeled label="Territories *">
                   {/* Existing patches, plus whatever this form has named that
                       does not exist yet — both are chips, because to the person
                       filling the form they are the same thing. */}
@@ -784,6 +803,57 @@ export default function UsersAdminPage() {
                     }}
                   />
 
+                  {/* Part, per patch. Written onto the TERRITORY, so it reads
+                      back the same for every officer posted there — and an
+                      administrator who sets it here has corrected the patch,
+                      not annotated this one person. */}
+                  {form.territoryNames.length > 0 && (
+                    <div className="mt-2.5 flex flex-col gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+                        Part
+                      </span>
+                      {form.territoryNames.map((name) => (
+                        <div key={name} className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-2">
+                            {name}
+                          </span>
+                          <div className="flex gap-1">
+                            {(["A", "B"] as const).map((part) => (
+                              <button
+                                key={part}
+                                type="button"
+                                className="po-chip"
+                                data-on={
+                                  form.territoryParts[name] === part || undefined
+                                }
+                                onClick={() =>
+                                  setForm({
+                                    ...form,
+                                    territoryParts: {
+                                      ...form.territoryParts,
+                                      // Clicking the part it already has clears
+                                      // it, which is the only way to say "not
+                                      // decided yet" once one has been set.
+                                      [name]:
+                                        form.territoryParts[name] === part ? "" : part,
+                                    },
+                                  })
+                                }
+                              >
+                                Part {part}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="text-[11px] leading-snug text-ink-3">
+                        Which half of the recovery organisation the patch belongs to. It
+                        belongs to the territory, not to this officer — set it once and every
+                        officer posted there reads the same.
+                      </p>
+                    </div>
+                  )}
+
                   {form.territoryNames.length > 1 && (
                     <div className="mt-2.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
@@ -810,13 +880,14 @@ export default function UsersAdminPage() {
                     </div>
                   )}
 
-                  {form.role === "RECOVERY_TEAM" && form.territoryNames.length <= 1 && (
+                  {form.territoryNames.length <= 1 && (
                     <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
                       At least one. This is what puts their captures on the coverage table — pick a
                       second if they are covering a patch nobody is posted to.
                     </p>
                   )}
                 </Labeled>
+                )}
               </div>
 
               {/* Sales runs its own map, drawn differently from the recovery

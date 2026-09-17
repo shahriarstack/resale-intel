@@ -557,6 +557,23 @@ export const userCreateSchema = z.object({
    */
   territoryNames: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   baseTerritoryName: z.string().trim().max(80).optional().or(z.literal("")),
+  /**
+   * Which half of the recovery organisation each named patch sits in.
+   *
+   * A property of the territory, not of the officer — two AROs on the same
+   * patch cannot disagree about its part — so this is applied to the row. A
+   * name with no entry here, or a null part, leaves whatever is already set
+   * alone rather than blanking it.
+   */
+  territoryParts: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(80),
+        part: z.enum(["A", "B"]).nullable(),
+      }),
+    )
+    .max(20)
+    .optional(),
   // The sales patch. Free text, and only meaningful on a sales officer — the
   // form hides it for every other role rather than storing a value nobody
   // will ever read.
@@ -633,6 +650,23 @@ export const userUpdateSchema = z.object({
   // Named postings, as on create. Present, they replace the ids above.
   territoryNames: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   baseTerritoryName: z.string().trim().max(80).optional().or(z.literal("")),
+  /**
+   * Which half of the recovery organisation each named patch sits in.
+   *
+   * A property of the territory, not of the officer — two AROs on the same
+   * patch cannot disagree about its part — so this is applied to the row. A
+   * name with no entry here, or a null part, leaves whatever is already set
+   * alone rather than blanking it.
+   */
+  territoryParts: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(80),
+        part: z.enum(["A", "B"]).nullable(),
+      }),
+    )
+    .max(20)
+    .optional(),
   salesTerritory: z.string().trim().max(80).optional().or(z.literal("")),
   isActive: z.boolean().optional(),
   portalId: nullableId,
