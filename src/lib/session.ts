@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import type { Role } from "@prisma/client";
 import { authOptions } from "./auth";
+import { prisma } from "./prisma";
 
 export interface SessionUser {
   id: string;
@@ -27,18 +28,59 @@ export interface SessionUser {
   baseTerritoryId: string | null;
 }
 
-/** The current user, or null. Use in pages/layouts that handle redirects. */
+/**
+ * The current user, or null. Use in pages/layouts that handle redirects.
+ *
+ * THE COOKIE SAYS WHO. THE DATABASE SAYS WHAT THEY HOLD.
+ *
+ * The token carries postings, written once when the account signs in. The
+ * `jwt` callback only fills them when `user` is present, which is at sign-in
+ * and never again — a re-issue on `updateAge` copies the token it was handed.
+ * So everything an administrator changes was invisible to the person it was
+ * changed for, for up to the sixty days the session lasts:
+ *
+ *   a territory assigned    the officer's own panel said none was, and
+ *                           `territoryDenied` refused captures against the
+ *                           patch they had just been given
+ *   a territory REMOVED     worse, and the reason this is not merely a
+ *                           refresh bug: they kept the right to file against
+ *                           a patch that was no longer theirs
+ *   a role changed          they kept the old desk
+ *   an account deactivated  the session outlived the decision to end it
+ *
+ * So the identity is taken from the cookie — that is what a signed token is
+ * for — and everything that can change underneath it is read fresh. One
+ * indexed lookup on a primary key, on pages that are `force-dynamic` and
+ * querying anyway.
+ */
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
-  const u = session.user;
+
+  const row = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      name: true,
+      staffId: true,
+      role: true,
+      isActive: true,
+      postings: { select: { territoryId: true, kind: true } },
+    },
+  });
+
+  // Deleted or deactivated between signing in and this request. Treated as
+  // signed out rather than as an error: the guards above this turn a null into
+  // a redirect to /login, which is what ending an account should feel like.
+  if (!row || !row.isActive) return null;
+
   return {
-    id: u.id,
-    name: u.name ?? "",
-    role: u.role,
-    staffId: u.staffId,
-    territoryIds: u.territoryIds ?? [],
-    baseTerritoryId: u.baseTerritoryId ?? null,
+    id: session.user.id,
+    name: row.name,
+    role: row.role,
+    staffId: row.staffId,
+    territoryIds: row.postings.map((p) => p.territoryId),
+    baseTerritoryId:
+      row.postings.find((p) => p.kind === "BASE")?.territoryId ?? null,
   };
 }
 
