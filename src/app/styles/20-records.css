@@ -421,3 +421,165 @@
     }
   }
 }
+
+/* ==========================================================================
+   Master data → Territories, derived
+
+   Two maps side by side that are never merged: recovery splits the country
+   into parts and staffs each patch with posted officers, sales draws its own
+   regions as free text on the officer. A name in both is a coincidence.
+
+   The panel leads with the exceptions, because everything else here is set in
+   the users console and an unstaffed patch is the only thing a reader can act
+   on from this screen.
+   ========================================================================== */
+
+@layer components {
+  .td-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .td-flag {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-size: 11.5px;
+    color: var(--ink-2);
+  }
+  .td-flag-warn {
+    border-color: color-mix(in oklab, var(--warn) 45%, var(--rule));
+    background: color-mix(in oklab, var(--warn) 12%, transparent);
+    color: var(--ink-1);
+  }
+
+  .td-maps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .td-map {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .td-map-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-bottom: 5px;
+    margin-bottom: 3px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .td-map-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .td-map-count {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+  }
+
+  .td-none {
+    padding: 10px 2px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  .td-row {
+    padding: 7px 8px;
+    border-radius: 8px;
+    background: var(--surface-2);
+  }
+  /* A patch nobody works reads differently from one that is simply quiet. */
+  .td-row[data-warn] {
+    background: color-mix(in oklab, var(--warn) 10%, var(--surface-2));
+  }
+
+  .td-row-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .td-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .td-part {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+  }
+  .td-part-none {
+    background: var(--surface-3);
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+
+  .td-row-sub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    margin-top: 3px;
+    font-size: 11.5px;
+  }
+
+  .td-officer {
+    color: var(--ink-2);
+  }
+  /* Cover is somebody standing in, not somebody who belongs here. */
+  .td-officer[data-cover] {
+    color: var(--ink-3);
+    font-style: italic;
+  }
+  .td-officer + .td-officer::before {
+    content: "·";
+    margin-right: 5px;
+    color: var(--ink-3);
+    font-style: normal;
+  }
+
+  .td-warn {
+    color: var(--warn);
+    font-weight: 500;
+  }
+
+  .td-count {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+  }
+
+  @media (max-width: 720px) {
+    .td-maps {
+      grid-template-columns: 1fr;
+    }
+  }
+}
