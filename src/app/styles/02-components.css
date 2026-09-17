@@ -1299,12 +1299,48 @@
     /* Callers set max-width via a Tailwind size class (max-w-sm/md/lg).
        Keep a floor here so a size-less dialog still renders. */
     max-width: 420px;
+    /* `dvh`, with `vh` first for anything that does not know the unit. On a
+       phone `100vh` counts the browser chrome in, so a dialog sized against it
+       is taller than the screen before a single field is drawn. */
     max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     overscroll-behavior: contain;
     animation: slideUp 0.22s var(--ease-standard);
+  }
+
+  /* ---- Why the Save button was unreachable ----------------------------
+     The panel is a clipped flex column. A flex child will not shrink below
+     its own content unless it is told it may — `min-height: 0` — so a form
+     taller than the screen pushed the footer past the panel's edge, where
+     `overflow: hidden` cut it off. Nothing scrolled, because nothing was
+     allowed to: the body had no overflow of its own and the panel refused to
+     grow. The button was not hidden. It was outside the box.
+
+     Three rules fix every dialog in the product at once, which is the point
+     of them living on the component rather than on the form that noticed. */
+  .modal-head,
+  .modal-foot {
+    flex-shrink: 0;
+  }
+
+  .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    /* A scroll that reaches its end must not carry on into the page behind
+       the dialog — on a phone that reads as the dialog falling apart. */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* The footer earns a hairline once the body is actually scrolling, so a
+     short dialog stays a single clean surface and a long one shows where the
+     content stops. */
+  .modal-foot {
+    background: var(--surface);
   }
   @media (min-width: 640px) {
     .modal-panel {
