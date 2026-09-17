@@ -50,3 +50,18 @@ next-env.d.ts
 
 # uploaded evidence (served from outside web root)
 /uploads/
+
+# Release archives. `/standalone.zip` alone was not enough: `build.zip` was
+# untracked but NOT ignored, 132 MB, and contained the .env that Next copies
+# into the standalone output — one `git add .` from publishing DATABASE_URL
+# and NEXTAUTH_SECRET.
+/build.zip
+/dist/
+/.deploy/
+
+# Local gh api dumps from debugging the deploy.
+/runs.json
+/jobs.json
+/latest_run.json
+/latest_jobs.json
+/job.log
