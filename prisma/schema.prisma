@@ -643,6 +643,15 @@ model Vehicle {
   @@index([assignedEngineerId])
   @@index([territoryId])
   @@index([repairDeadline])
+
+  // The sold book, which two things read and neither can use `status` alone.
+  //
+  // `getResalePnl` takes every SOLD row ordered by `soldAt` desc, and the
+  // retention sweep takes SOLD rows with `soldAt` before a cutoff. On
+  // `@@index([status])` both scan every sale ever made and then filesort, and
+  // the set they scan only grows — this is the one query in the product with
+  // no date window, because a P&L that forgets last year is not a P&L.
+  @@index([status, soldAt])
 }
 
 model DocumentAnswer {

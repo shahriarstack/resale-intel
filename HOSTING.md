@@ -96,9 +96,10 @@ DATABASE_URL=mysql://user:password@localhost:3306/dbname
 NEXTAUTH_SECRET=<48 random bytes, base64>
 NEXTAUTH_URL=https://resale.example.com
 UPLOAD_DIR=/home/<account>/resale-uploads
+TZ=Asia/Dhaka
 ```
 
-Four things about these:
+Five things about these:
 
 - **`NEXTAUTH_SECRET` is the only real secret in the system.** Anyone who knows
   it can mint a valid session for any role, including Super Admin. Generate it,
@@ -114,6 +115,21 @@ Four things about these:
   first: `mkdir -p /home/<account>/resale-uploads`.
 - **A password containing `]`, `)`, `@` or `/` must be percent-encoded** inside
   `DATABASE_URL`.
+- **`TZ` is not optional, and its absence is silent.** A Linux host runs in UTC
+  unless told otherwise; this business runs in Dhaka, six hours ahead. Node's
+  local-time methods then answer for the wrong day, and the product uses them
+  in forty-odd places — month keys, day buckets, "is this backdated".
+
+  What that looks like in practice: a vehicle sold at 02:30 on 1 October is
+  20:30 on 30 September in UTC, so `monthKey` files it under **September** and
+  the resale P&L reports it in the wrong month. A capture recorded before 06:00
+  is stamped "Backdated to yesterday" in its own audit trail. Worse, the
+  BROWSER is in Dhaka and the server is not, so for the first six hours of
+  every day the two disagree about what day it is — the officer's screen and
+  the record it writes do not match, and nothing errors.
+
+  None of this throws. It just quietly produces wrong dates, and every figure
+  derived from them inherits the error.
 
 If you keep a `.env` file instead, `update_env.ps1` writes one from environment
 variables and refuses an `UPLOAD_DIR` inside the deployment directory.
