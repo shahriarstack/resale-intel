@@ -75,6 +75,11 @@ const blank = {
   // this officer, so the control shows what the row already says and writing
   // it corrects the row for everyone posted there.
   territoryParts: {} as Record<string, RecoveryPart | "">,
+  // The part the composer will stamp on the next patch it adds. Sits beside
+  // the territory box rather than appearing after it: an administrator
+  // answering "which patch, which part" is answering one question, and a
+  // control that only exists once half of it is done reads as missing.
+  pendingPart: "" as RecoveryPart | "",
   salesTerritory: "",
   portalId: "",
   isActive: true,
@@ -313,6 +318,7 @@ export default function UsersAdminPage() {
       territoryParts: Object.fromEntries(
         u.postings.map((p) => [p.territory.name, p.territory.part ?? ""]),
       ),
+      pendingPart: "" as RecoveryPart | "",
       salesTerritory: u.salesTerritory ?? "",
       portalId: u.portalId ?? "",
       isActive: u.isActive,
@@ -329,6 +335,21 @@ export default function UsersAdminPage() {
     // Manager sees them under either part.
     // The same rule the API enforces, so the admin reads it before the round
     // trip rather than after it — and it is the API's own message.
+    // Part is required on the recovery desk, and the message names the patch
+    // that is missing one rather than saying "part is required" over a form
+    // holding three of them.
+    if (form.role === "RECOVERY_TEAM") {
+      const without = form.territoryNames.filter((n) => !form.territoryParts[n]);
+      if (without.length) {
+        setError(
+          without.length === 1
+            ? `Choose part A or B for ${without[0]}.`
+            : `Choose part A or B for ${without.join(", ")}.`,
+        );
+        return;
+      }
+    }
+
     const posting = postingError(
       form.role,
       form.territoryNames,
@@ -774,7 +795,7 @@ export default function UsersAdminPage() {
                     switching somebody's role never silently drops postings
                     somebody set on purpose. */}
                 {form.role === "RECOVERY_TEAM" && (
-                <Labeled label="Territories *">
+                <Labeled label="Territories &amp; part *">
                   {/* Existing patches, plus whatever this form has named that
                       does not exist yet — both are chips, because to the person
                       filling the form they are the same thing. */}
@@ -821,27 +842,60 @@ export default function UsersAdminPage() {
                   {/* Naming a patch is how a patch is created. There is no
                       other screen to visit first, and no list to keep in step
                       with the roster. */}
-                  <input
-                    className="field mt-2"
-                    placeholder="Type a territory, press Enter…"
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      e.preventDefault();
-                      const name = e.currentTarget.value.trim();
-                      if (!name) return;
-                      if (form.territoryNames.includes(name)) {
+                  {/* ONE ROW, TWO ANSWERS. The patch and its part are asked
+                      together because they are one decision — the part is a
+                      property of the patch being named, and a control that
+                      only appeared after the name was entered read to its user
+                      as a missing field. Enter stamps the selected part onto
+                      the patch it adds. */}
+                  <div className="mt-2 flex items-stretch gap-1.5">
+                    <input
+                      className="field min-w-0 flex-1"
+                      placeholder="Type a territory…"
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        const name = e.currentTarget.value.trim();
+                        if (!name) return;
+                        if (form.territoryNames.includes(name)) {
+                          e.currentTarget.value = "";
+                          return;
+                        }
+                        const next = [...form.territoryNames, name];
+                        setForm({
+                          ...form,
+                          territoryNames: next,
+                          baseTerritoryName: form.baseTerritoryName || next[0],
+                          territoryParts: {
+                            ...form.territoryParts,
+                            [name]: form.pendingPart,
+                          },
+                          // Cleared after use: the next patch is a fresh
+                          // question, and carrying the last answer forward is
+                          // how every officer ends up in part A.
+                          pendingPart: "",
+                        });
                         e.currentTarget.value = "";
-                        return;
-                      }
-                      const next = [...form.territoryNames, name];
-                      setForm({
-                        ...form,
-                        territoryNames: next,
-                        baseTerritoryName: form.baseTerritoryName || next[0],
-                      });
-                      e.currentTarget.value = "";
-                    }}
-                  />
+                      }}
+                    />
+                    {(["A", "B"] as const).map((part) => (
+                      <button
+                        key={part}
+                        type="button"
+                        className="po-chip shrink-0"
+                        data-on={form.pendingPart === part || undefined}
+                        title={`Add the next patch as part ${part}`}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            pendingPart: form.pendingPart === part ? "" : part,
+                          })
+                        }
+                      >
+                        {part}
+                      </button>
+                    ))}
+                  </div>
                   {/* Said before it is true, not after.
                       The Part control only exists once a patch does, which
                       made it invisible to anyone reading the empty form — they
@@ -850,9 +904,10 @@ export default function UsersAdminPage() {
                       line and removes the whole confusion. */}
                   {form.territoryNames.length === 0 && (
                     <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
-                      Press <strong className="text-ink-2">Enter</strong> to add it — then
-                      choose its <strong className="text-ink-2">Part</strong> (A or B) below.
-                      A patch that does not exist yet is created when you save.
+                      Pick <strong className="text-ink-2">A</strong> or{" "}
+                      <strong className="text-ink-2">B</strong>, then press{" "}
+                      <strong className="text-ink-2">Enter</strong> to add the patch. A patch
+                      that does not exist yet is created when you save.
                     </p>
                   )}
 

@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { portalPairingError } from "@/lib/portals";
 import { resolveTerritoryNames } from "@/lib/masterData";
-import { postingError } from "@/lib/postings";
+import { partError, postingError } from "@/lib/postings";
 import { userUpdateSchema } from "@/lib/validation";
 
 const publicSelect = {
@@ -94,6 +94,12 @@ export const PATCH = withGuard(
         (data.territoryParts ?? []).map((t) => [t.name.toLowerCase(), t.part]),
       );
       const resolved = await resolveTerritoryNames(data.territoryNames, partMap);
+      const missingPart = partError(
+        nextRole,
+        data.territoryNames,
+        partMap,
+      );
+      if (missingPart) return fail(missingPart, 422);
       if ("error" in resolved) return fail(resolved.error, 422);
       namedIds = resolved.ids;
       const baseName = data.baseTerritoryName?.trim();

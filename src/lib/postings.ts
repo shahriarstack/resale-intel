@@ -188,6 +188,27 @@ export function vacantTerritoryIds(
  * be a constraint — which makes this the only place it is true. Returns the
  * message to show, or null.
  */
+/**
+ * Every recovery patch has to sit in a part.
+ *
+ * Enforced for RECOVERY_TEAM only, and named per patch: "part is required" is
+ * unhelpful on a form holding three of them. Part is a property of the
+ * territory, so this is really asking the administrator to classify a patch
+ * they may have just created — which is exactly the moment they know.
+ */
+export function partError(
+  role: string,
+  territoryNames: string[],
+  partByName: Map<string, "A" | "B" | null>,
+): string | null {
+  if (role !== "RECOVERY_TEAM") return null;
+  const missing = territoryNames.filter((n) => !partByName.get(n.toLowerCase()));
+  if (!missing.length) return null;
+  return missing.length === 1
+    ? `Choose part A or B for ${missing[0]}.`
+    : `Choose part A or B for ${missing.join(", ")}.`;
+}
+
 export function postingError(
   role: string,
   territoryIds: string[],

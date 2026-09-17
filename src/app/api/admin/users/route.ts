@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { portalPairingError } from "@/lib/portals";
 import { resolveTerritoryNames } from "@/lib/masterData";
-import { postingError } from "@/lib/postings";
+import { partError, postingError } from "@/lib/postings";
 import { userCreateSchema } from "@/lib/validation";
 
 // Never returns passwordHash.
@@ -58,6 +58,12 @@ export const POST = withGuard(async (request: Request) => {
       (data.territoryParts ?? []).map((t) => [t.name.toLowerCase(), t.part]),
     );
     const resolved = await resolveTerritoryNames(data.territoryNames, partMap);
+  const missingPart = partError(
+    data.role,
+    data.territoryNames,
+    partMap,
+  );
+  if (missingPart) return fail(missingPart, 422);
     if ("error" in resolved) return fail(resolved.error, 422);
     territoryIds = resolved.ids;
     const baseName = data.baseTerritoryName?.trim();
