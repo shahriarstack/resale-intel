@@ -25,6 +25,32 @@ export async function GET(
   const user = await getSessionUser();
   if (!user) return fail("Sign in required", 401);
 
+  // A PORTAL VIEWER IS NOT STAFF.
+  //
+  // Every other role here is somebody employed to move vehicles through the
+  // eight desks, and the product lets all of them read any vehicle record —
+  // that is deliberate and documented in api/vehicles/[id], where what gets
+  // withheld is the cost basis, not the file. Serving an evidence photograph
+  // to a desk is consistent with that.
+  //
+  // A portal member is an outsider on a named lens: a board observer, an
+  // auditor, a finance reader. The Portal model promises they "sign in to
+  // exactly that and nothing else", and the transition table already makes
+  // that true for actions — PORTAL_VIEWER appears in no row, so they can move
+  // nothing. It was NOT true for reads. This route authenticated and then
+  // served, so a portal member holding any filename got the bytes.
+  //
+  // Nothing is lost by refusing. The widest photograph grant a portal can
+  // carry is `showPhotos`, and even switched on it yields a COUNT — see
+  // portalDesk.ts, `photoCount: grant.showPhotos ? v._count.photos : null`,
+  // and the lens's own `redactedAs: "Photo counts only"`. No portal surface
+  // has ever linked to this route, so no portal screen can break.
+  //
+  // 404 rather than 403, matching the response for a name that does not
+  // resolve: a refusal that distinguishes "exists but forbidden" from "no such
+  // file" hands an enumerator the one bit they were missing.
+  if (user.role === "PORTAL_VIEWER") return fail("Not found", 404);
+
   const { name } = await context.params;
   const full = resolveStoredPath(name);
   if (!full) return fail("Not found", 404);

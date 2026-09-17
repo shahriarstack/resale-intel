@@ -39,9 +39,16 @@ export const authOptions: NextAuthOptions = {
    * sitting on a phone in a yard. A session that never expires at all is not a
    * convenience, it is a lost handset.
    *
-   * The token carries the role and the postings, so re-issuing it is also what
-   * picks up a territory reassigned in the admin console without the officer
-   * having to sign out and back in.
+   * The token carries the role and the postings, but DO NOT rely on them being
+   * current. This comment used to claim that re-issuing the token picks up a
+   * territory reassigned in the admin console; it does not. `updateAge` hands
+   * the `jwt` callback the existing token with no `user`, and the callback
+   * only writes postings when `user` is present — so what is in here is
+   * whatever was true at sign-in, for as long as the session lasts.
+   *
+   * `getSessionUser` therefore reads the role, the postings and the active
+   * flag from the database on every request, and is the only thing that should
+   * be trusted for them. What the token is for is saying WHO this is.
    */
   session: {
     strategy: "jwt",

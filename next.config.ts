@@ -2,6 +2,74 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["@prisma/client", "bcryptjs"],
+
+  /**
+   * FORCE HTTPS — from the application, because nothing in front of it can.
+   *
+   * cPanel's "Force HTTPS Redirect" is switched on for this domain and does
+   * nothing: Passenger claims the vhost with `PassengerBaseURI "/"`, so the
+   * request reaches this process before LiteSpeed's redirect would run. The
+   * toggle is left on anyway — it costs nothing and is right if the app ever
+   * moves off Passenger.
+   *
+   * This matters beyond the padlock. Sign-in posts a Staff ID that is also the
+   * passcode, and the session cookie is what a whole eight-desk audit trail
+   * rests on. Over http both cross the network in the clear, and the cookie is
+   * issued without a `secure` flag.
+   *
+   * LOOP SAFETY, because a redirect loop here takes the whole site down: the
+   * rule fires only when `x-forwarded-proto` is exactly "http", the header
+   * LiteSpeed sets on the proxied request. A TLS request carries "https" and
+   * does not match; a request carrying no such header does not match either.
+   * The only way to loop is a proxy that reports "http" for a TLS connection,
+   * which is why this is a `has` condition on a specific value rather than a
+   * blanket redirect. The deploy's health check polls https and fails the job
+   * if this ever does start looping.
+   */
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "header", key: "x-forwarded-proto", value: "http" }],
+        destination: "https://resale.cv-acimotors.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
+
+  /**
+   * Tell the browser never to try http again.
+   *
+   * The redirect above fixes the request that has already been made in the
+   * clear; this stops there being a next one. After a single https response
+   * the browser upgrades every later request to this host itself, so a typed
+   * bare domain or an old bookmark never touches http again.
+   *
+   * Two years, and `includeSubDomains` is deliberately ABSENT: this is one
+   * subdomain of cv-acimotors.com, and asserting a policy over siblings that
+   * may not have certificates would take them offline. No `preload` for the
+   * same reason — that is a commitment to the whole parent domain.
+   */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000",
+          },
+          // The app renders no third-party frames and is never framed itself.
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          // Vehicle photographs and customer names should not travel to other
+          // origins in a Referer header.
+          { key: "Referrer-Policy", value: "same-origin" },
+        ],
+      },
+    ];
+  },
 
   images: {
     /**

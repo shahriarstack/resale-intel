@@ -131,7 +131,13 @@ export function AppShell({
       // `shell-mobile` publishes the height of the bar below as --shell-top,
       // so a page with its own sticky element (the marketplace's filter rail)
       // can pin itself under this header instead of behind it.
-      <div className="shell-mobile flex min-h-screen flex-col">
+      //
+      // `dvh`, not `vh`. On a phone `100vh` counts the browser chrome in, so
+      // the page is always taller than what is visible: the bottom of every
+      // screen sits under the URL bar until you scroll, and the layout jumps
+      // when that bar collapses. `dvh` tracks the real viewport, which is most
+      // of the difference between a page in a browser and an app.
+      <div className="shell-mobile flex min-h-dvh flex-col">
         {/* Compact by design. This bar is pinned over every screen on a phone,
             so its height is taken from the work rather than added to the page
             — and the field roles read this one-handed in a yard, where a

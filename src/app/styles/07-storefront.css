@@ -1445,9 +1445,21 @@
      that bar. The shell publishes its height; everything else defaults to 0. */
   .shell-bar {
     min-height: var(--shell-bar-h);
+    /* The notch, now that `viewport-fit: cover` hands us the whole screen.
+       The bar keeps its own height and grows by whatever the system reserves,
+       so the title never sits under the camera cutout and the bar still reads
+       as one surface running to the top edge rather than a strip below a
+       white gap. Zero on every phone without an inset. */
+    padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
   }
   .shell-mobile {
-    --shell-top: var(--shell-bar-h);
+    /* Anything pinning itself under the bar has to clear the inset too, or it
+       parks behind the notch instead of behind the bar. */
+    --shell-top: calc(var(--shell-bar-h) + env(safe-area-inset-top, 0px));
+    /* Landscape on a notched phone puts the cutout on one SIDE. Without this
+       the first column of every list is under it. */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
   /* Clearance for the fixed tab strip, safe area included. Replaces a
      hardcoded pb-24 that ran 35px past the bar it was clearing. */

@@ -1,18 +1,277 @@
-name: Deploy to cPanel
+name: Build and Deploy to cPanel
 
+# ONE BRANCH DEPLOYS. Previously this was `'**'`, so a push to any branch
+# replaced production — including `main`, which is twelve commits behind this
+# one and predates the cPanel pipeline entirely. Change the branch name here if
+# the shipping branch changes; do not widen it back to a glob.
 on:
   push:
     branches:
-      - '**'
+      - rebuild/foundations
+  workflow_dispatch:
+
+# Nothing here writes to the repository.
+permissions:
+  contents: read
+
+# A second push while a deploy is mid-flight would have two jobs extracting
+# different archives over the same directory.
+concurrency:
+  group: cpanel-deploy
+  cancel-in-progress: false
+
+env:
+  APP_ROOT: /home/cvacimot/resale
+  APP_ROOT_REL: resale
+  # https, not http. TLS is live on this domain, and the health check should
+  # exercise the scheme people actually use — a certificate that expires or
+  # stops being served is a site outage this step would otherwise miss.
+  SITE_URL: https://resale.cv-acimotors.com
 
 jobs:
-  deploy:
-    name: Trigger cPanel Git Update
+  build-and-deploy:
+    name: Build Next.js and Deploy to cPanel
     runs-on: ubuntu-latest
     steps:
-      - name: Call cPanel UAPI to Pull and Deploy
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm install`, not `npm ci`, and not by preference.
+      #
+      # `npm ci` is what this should be — there is a lockfile, and a release
+      # built from freshly resolved dependencies is not the release that was
+      # tested. It was tried and it fails the build:
+      #
+      #   npm error Missing: @emnapi/runtime@1.11.3 from lock file
+      #   npm error Missing: @emnapi/core@1.11.3 from lock file
+      #
+      # Those are optional dependencies of sharp's wasm variant. The lockfile
+      # is generated on Windows, where npm prunes packages constrained to
+      # other platforms and records no entry for them; on a Linux runner npm
+      # expects them and calls the lockfile out of sync. `--package-lock-only`
+      # does not fix it, with or without `--os=linux --cpu=x64`, because the
+      # pruning happens at resolution.
+      #
+      # To restore `npm ci`: regenerate package-lock.json ON LINUX — WSL, a
+      # container, or a throwaway CI job — and commit that. Until then this
+      # stays, because a reproducible build is worth less than a building one.
+      - name: Install dependencies
+        run: npm install
+
+      # The connection string is a SECRET. It used to sit in this file as
+      # plaintext, on a repository that is pushed to GitHub. `npm run build`
+      # runs `prisma generate` and then `next build`, and the build needs it
+      # because PrismaClient is constructed at module scope.
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Package release
         run: |
-          curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
-          "https://116.202.222.251:2083/execute/VersionControl/update?repository_root=/home/cvacimot/repositories/resale&branch=rebuild/foundations" -k
-          curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
-          "https://116.202.222.251:2083/execute/VersionControlDeployment/create?repository_root=/home/cvacimot/repositories/resale" -k
+          set -euo pipefail
+
+          mkdir -p .deploy/app
+
+          # `/.` so dotfiles come too. `.next/` is a dotfile, and an earlier
+          # revision of this step used `.next/standalone/*` — which silently
+          # shipped a release with no server bundle in it.
+          cp -a .next/standalone/. .deploy/app/
+
+          # NO .env IS SHIPPED, DELIBERATELY.
+          #
+          # The line that used to be here was `cp -a .next/standalone/.env* …`.
+          # On this runner it was a no-op — .env is gitignored, so the checkout
+          # has none — and anywhere it was not a no-op it was actively wrong:
+          # Next copies the project's .env into the standalone output, so that
+          # line's only possible effect is to overwrite the server's own
+          # configuration with a developer's local one. A production app
+          # pointed at localhost, and every session cookie invalidated.
+          # zip_standalone.ps1 deletes .env for exactly this reason.
+          #
+          # Configuration lives in cPanel → Setup Node.js App → environment
+          # variables. Passenger starts the app with those, not with a file.
+          rm -f .deploy/app/.env*
+
+          # Dev evidence must never reach the live upload directory: those
+          # files have no vehicle record pointing at them, so the retention
+          # sweep can never remove them. Gitignored, so normally absent here.
+          rm -rf .deploy/app/uploads
+
+          mkdir -p .deploy/app/.next
+          cp -r .next/static .deploy/app/.next/static
+          cp -r public .deploy/app/public
+
+          # The schema and the migration scripts travel with the release, so
+          # database work can be done on the server against the exact schema
+          # the code was built from. HOSTING.md documents the order, which is
+          # not optional. Plain .mjs against @prisma/client, already bundled —
+          # nothing to install on the host.
+          mkdir -p .deploy/app/prisma
+          cp prisma/schema.prisma .deploy/app/prisma/schema.prisma
+          cp -r deploy .deploy/app/deploy
+
+          # SHIP THE REAL PRISMA CLIENT, NOT THE TRACED ONE.
+          #
+          # This is what has been crashing the application on boot:
+          #
+          #   Error: An error occurred while loading instrumentation hook:
+          #   Failed to load external module @prisma/client-…:
+          #   SyntaxError: Unexpected token '.'
+          #
+          # Next's file tracer does not follow @prisma/client's entry chain.
+          # `main` is default.js, which re-exports `.prisma/client/default`,
+          # which in turn requires `#main-entry-point` — a package `imports`
+          # subpath, resolved through .prisma/client's own package.json rather
+          # than by a path the tracer can see. So what lands in the standalone
+          # output is a three-file skeleton — default.js, package.json and
+          # runtime/ — with no index.js behind it, and requiring it fails.
+          #
+          # instrumentation.ts is what surfaces it. That hook runs on server
+          # start and imports lib/photoRetention, which imports lib/prisma, so
+          # an unloadable client is a boot failure rather than a bad request:
+          # Passenger never gets a listening process and answers 500 to
+          # everything it cannot serve statically out of public/.
+          #
+          # Copying the installed package over the traced one is the standard
+          # fix. Cheap, and it cannot regress: it can only ever add files the
+          # tracer decided were unreachable.
+          rm -rf .deploy/app/node_modules/@prisma/client .deploy/app/node_modules/.prisma
+          mkdir -p .deploy/app/node_modules/@prisma
+          cp -a node_modules/@prisma/client .deploy/app/node_modules/@prisma/client
+          cp -a node_modules/.prisma .deploy/app/node_modules/.prisma
+
+          # Fail the build rather than ship the skeleton again.
+          test -f .deploy/app/node_modules/@prisma/client/index.js
+          test -f .deploy/app/node_modules/.prisma/client/index.js
+          echo "prisma client: $(ls .deploy/app/node_modules/@prisma/client | wc -l) entries"
+
+          # cPanel's Node.js App puts a node_modules SYMLINK in the application
+          # root, which blocks extraction over it. Nesting the real app one
+          # level down sidesteps that; this shim is the startup file Passenger
+          # runs. Next's standalone server.js chdirs to its own directory, so
+          # it resolves .next and public relative to app/, not to here.
+          echo "require('./app/server.js');" > .deploy/server.js
+
+          # Passenger restarts when this file's mtime changes. The archive
+          # carries a fresh one on every build.
+          mkdir -p .deploy/tmp
+          date -u +"restarted %Y-%m-%dT%H:%M:%SZ" > .deploy/tmp/restart.txt
+
+          # Its own directory, so the upload step sends one file instead of
+          # diffing the whole workspace and then excluding all of it.
+          mkdir -p dist
+          ( cd .deploy && zip -qry ../dist/build.zip . )
+          ls -lh dist/build.zip
+
+      # FTPS rather than plain FTP. The previous version set no `protocol`, and
+      # this action defaults to unencrypted FTP — the account password and the
+      # entire release crossing the internet in clear.
+      #
+      # `security: loose` still tolerates a certificate this action cannot
+      # chain, which shared-host FTPS commonly presents even on the right
+      # hostname. Try `strict` once a deploy has been seen to work; the
+      # transport is encrypted either way, and this is not the step that was
+      # sending the password in the clear.
+      - name: Upload release
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ vars.CPANEL_HOST }}
+          username: ${{ secrets.CPANEL_USER }}
+          password: ${{ secrets.CPANEL_PASS }}
+          protocol: ftps
+          security: loose
+          local-dir: ./dist/
+          server-dir: /${{ env.APP_ROOT_REL }}/
+
+      # Extraction goes through cPanel's own authenticated API — the same call
+      # deploy.ps1 has always used.
+      #
+      # It replaces `unzip.php`: a PHP extractor written into the public
+      # document root and then fired by an unauthenticated GET. That left a
+      # permanent, world-reachable endpoint that re-extracts an archive over
+      # the live application on demand. DELETE THAT FILE FROM THE SERVER:
+      #   /home/cvacimot/public_html/resale.cv-acimotors.com/unzip.php
+      #
+      # TLS is verified. The previous version addressed the API by bare IP and
+      # passed `-k`, which disables certificate checking entirely — the account
+      # password went out over a connection nothing authenticated. The
+      # CPANEL_HOST repository variable now holds the real hostname the
+      # certificate is issued for, so the check passes on its own merits.
+      - name: Extract on cPanel
+        env:
+          HOST: ${{ vars.CPANEL_HOST }}
+          AUTH: ${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}
+        run: |
+          set -euo pipefail
+          echo "Extracting into $APP_ROOT"
+          curl -sS -u "$AUTH" --get "https://$HOST:2083/json-api/cpanel" \
+            --data-urlencode "cpanel_jsonapi_apiversion=2" \
+            --data-urlencode "cpanel_jsonapi_module=Fileman" \
+            --data-urlencode "cpanel_jsonapi_func=fileop" \
+            --data-urlencode "op=extract" \
+            --data-urlencode "sourcefiles=$APP_ROOT_REL/build.zip" \
+            --data-urlencode "destfiles=$APP_ROOT" \
+            --data-urlencode "doubledecode=1" | tee /tmp/extract.json
+          echo
+
+          # The API answers 200 and puts the failure in the body, so the exit
+          # code says nothing. The health check at the end is the real verdict;
+          # this only makes an obvious failure obvious in the log.
+          if grep -qi '"result":0' /tmp/extract.json; then
+            echo "::error::cPanel reported an extraction failure"
+            exit 1
+          fi
+
+      # Passenger picks up the restart.txt carried in the archive. Touching it
+      # again through the API covers an extractor that preserved an old mtime.
+      - name: Restart the application
+        env:
+          HOST: ${{ vars.CPANEL_HOST }}
+          AUTH: ${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}
+        run: |
+          set -euo pipefail
+          curl -sS -u "$AUTH" --get "https://$HOST:2083/execute/Fileman/save_file_content" \
+            --data-urlencode "dir=$APP_ROOT/tmp" \
+            --data-urlencode "file=restart.txt" \
+            --data-urlencode "content=restarted $(date -u +%FT%TZ)" > /dev/null
+          echo "restart.txt touched"
+
+      # THE STEP THIS PIPELINE NEVER HAD.
+      #
+      # Every previous version ended with `curl -s <url>`, which exits 0 on a
+      # 500 as readily as on a 200 and discards the body. The job went green
+      # while the site served Passenger's spawn-failure stub, so a broken
+      # deploy was indistinguishable from a working one — which is why the
+      # application has been down through a run of successful builds.
+      #
+      # Passenger spawns lazily and a cold Next start is not instant, so this
+      # retries rather than asking once.
+      - name: Verify the site is live
+        run: |
+          set -uo pipefail
+          for attempt in $(seq 1 10); do
+            code=$(curl -s -o /tmp/body -m 20 -w '%{http_code}' "$SITE_URL/login" || echo 000)
+            echo "attempt $attempt: $code"
+            if [ "$code" = "200" ]; then
+              echo "::notice::$SITE_URL is live"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Deploy finished but $SITE_URL/login returned $code"
+          echo "--- response body ---"
+          head -c 2000 /tmp/body || true
+          echo
+          echo "Read stderr.log in the Passenger application root, and confirm"
+          echo "cPanel -> Setup Node.js App -> Application root is $APP_ROOT,"
+          echo "startup file server.js, with DATABASE_URL, NEXTAUTH_SECRET,"
+          echo "NEXTAUTH_URL and UPLOAD_DIR set in that panel."
+          exit 1

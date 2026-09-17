@@ -1299,13 +1299,56 @@
     /* Callers set max-width via a Tailwind size class (max-w-sm/md/lg).
        Keep a floor here so a size-less dialog still renders. */
     max-width: 420px;
+    /* `dvh`, with `vh` first for anything that does not know the unit. On a
+       phone `100vh` counts the browser chrome in, so a dialog sized against it
+       is taller than the screen before a single field is drawn. */
     max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* THE PANEL SCROLLS ITSELF BY DEFAULT.
+       Most dialogs in this product are hand-rolled — `.modal-panel` with
+       padding and their own children, not the Header/Body/Footer trio — so a
+       panel that clipped its overflow put their last field and their save
+       button outside the box with no way to reach either. Scrolling is the
+       safe default because it is the behaviour a dialog that knows nothing
+       about its own contents should have. */
+    overflow-y: auto;
     overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     animation: slideUp 0.22s var(--ease-standard);
   }
+
+  /* ---- The composed dialog opts out ----------------------------------
+     `Modal` builds a header, a scrolling body and a pinned footer, so there
+     the PANEL must not scroll — the body does, and the footer stays put with
+     the save button always visible. Marked explicitly rather than detected
+     with `:has()`, so the rule does not depend on selector support. */
+  .modal-panel-split {
+    overflow: hidden;
+  }
+
+  .modal-head,
+  .modal-foot {
+    flex-shrink: 0;
+  }
+
+  /* A flex child will not shrink below its own content unless it is told it
+     may. Without `min-height: 0` the body keeps its full height, pushes the
+     footer past the panel's edge, and nothing scrolls because nothing was
+     allowed to. */
+  .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-foot {
+    background: var(--surface);
+  }
+
   @media (min-width: 640px) {
     .modal-panel {
       animation: scaleIn 0.2s var(--ease-standard);

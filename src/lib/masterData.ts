@@ -50,3 +50,113 @@ export function emptyToNull(v: string | undefined | null): string | null {
   const t = v.trim();
   return t === "" ? null : t;
 }
+
+/**
+ * Turn typed territory names into territory rows, creating what is new.
+ *
+ * THE TERRITORY LIST IS NOT A THING ANYBODY MAINTAINS SEPARATELY. It is
+ * whatever the field force is posted to. An administrator adding an ARO types
+ * the patch that officer works; if it is the first officer there, the patch
+ * comes into existence at that moment. Nobody visits a second screen first,
+ * and there is no list that can drift from the roster it describes.
+ *
+ * This deliberately does NOT remove the Territory table, which would be the
+ * obvious reading of "no need for territories in master data". Four things
+ * hold a territory id and none of them could be rebuilt from text scattered
+ * across user rows:
+ *
+ *   coverage       a territory with NO officer is the single most important
+ *                  row on that board. Derive the list from postings and an
+ *                  unstaffed patch becomes unrepresentable — exactly the
+ *                  condition the board exists to show
+ *   part A / B     lives on the territory, and drives the Recovery Manager's
+ *                  filter across the whole dashboard
+ *   portals        scope by territory; a lens over "Chittagong" has to mean a
+ *                  row, not a spelling
+ *   captures       `territoryDenied` compares an officer's postings to the
+ *                  vehicle's territory. Free text would make that a string
+ *                  comparison, and "CTG-North" vs "CTG North" would silently
+ *                  become two patches
+ *
+ * So the row stays and the SCREEN goes: territories are born from the users
+ * console, and master data keeps them only to set Part A/B and retire the ones
+ * nobody works any more.
+ *
+ * Matching is by name and case-insensitive, because the column's collation is
+ * utf8mb4_unicode_ci — "Dhaka South" and "dhaka south" are already the same
+ * row to the database, and the API must agree with that rather than create a
+ * duplicate the unique index would then refuse.
+ */
+export async function resolveTerritoryNames(
+  names: string[],
+  /**
+   * Which half of the recovery organisation each patch belongs to, when the
+   * caller knows. Part is a property of the TERRITORY, not of the officer —
+   * two AROs posted to Dhaka South cannot disagree about which part it is in —
+   * so this writes it onto the row and a later posting that names a different
+   * part corrects it rather than forking it.
+   *
+   * Omitted, or given as null, the existing part is left alone. That matters
+   * on edit: an administrator changing an officer's patches should not blank
+   * the part somebody set deliberately.
+   */
+  parts?: Map<string, "A" | "B" | null>,
+): Promise<{ ids: string[]; idByName: Map<string, string> } | { error: string }> {
+  const wanted = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+  if (wanted.length === 0) return { ids: [], idByName: new Map() };
+
+  for (const n of wanted) {
+    if (n.length > 80) return { error: `Territory name is too long: ${n.slice(0, 40)}…` };
+  }
+
+  const existing = await prisma.territory.findMany({
+    where: { name: { in: wanted } },
+    select: { id: true, name: true, part: true },
+  });
+
+  // Keyed lower-case so the lookup folds case the same way the column does.
+  const idByName = new Map<string, string>();
+  const partOf = new Map<string, "A" | "B" | null>();
+  for (const t of existing) {
+    idByName.set(t.name.toLowerCase(), t.id);
+    partOf.set(t.name.toLowerCase(), t.part);
+  }
+
+  for (const name of wanted) {
+    const wantPart = parts?.get(name.toLowerCase()) ?? null;
+
+    if (idByName.has(name.toLowerCase())) {
+      // Already a row. Only write when a part was actually supplied AND it
+      // differs — an update per save would churn the table for nothing.
+      if (wantPart && partOf.get(name.toLowerCase()) !== wantPart) {
+        await prisma.territory.update({
+          where: { id: idByName.get(name.toLowerCase())! },
+          data: { part: wantPart },
+        });
+      }
+      continue;
+    }
+    try {
+      const made = await prisma.territory.create({
+        data: { name, part: wantPart },
+        select: { id: true, name: true },
+      });
+      idByName.set(made.name.toLowerCase(), made.id);
+    } catch {
+      // Two administrators adding officers to the same new patch at once. The
+      // unique index refused the second create, which means the row now exists
+      // — so read it rather than failing a user creation over a race.
+      const found = await prisma.territory.findFirst({
+        where: { name },
+        select: { id: true },
+      });
+      if (!found) return { error: `Could not create territory "${name}"` };
+      idByName.set(name.toLowerCase(), found.id);
+    }
+  }
+
+  return {
+    ids: wanted.map((n) => idByName.get(n.toLowerCase())!).filter(Boolean),
+    idByName,
+  };
+}

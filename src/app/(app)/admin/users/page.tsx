@@ -51,6 +51,7 @@ interface AdminUser {
 interface Territory {
   id: string;
   name: string;
+  part: RecoveryPart | null;
 }
 /** Only the two fields the picker needs — the composition lives at
  *  /admin/portals and is not this form's business. */
@@ -60,19 +61,43 @@ interface PortalOption {
   isActive: boolean;
 }
 
+/** The add/edit form's shape, so the commit helper can be typed. */
+type FormState = typeof blank;
+
 const blank = {
   name: "",
   staffId: "",
   designation: "",
   role: "RECOVERY_TEAM" as Role,
-  territoryIds: [] as string[],
-  baseTerritoryId: "",
+  // Names, not ids. A territory comes into existence when an officer is
+  // posted to it, so the form cannot work in ids — a patch being named for
+  // the first time has none yet. The API resolves these to rows.
+  territoryNames: [] as string[],
+  baseTerritoryName: "",
+  // Part per patch, keyed by name. A property of the territory rather than of
+  // this officer, so the control shows what the row already says and writing
+  // it corrects the row for everyone posted there.
+  territoryParts: {} as Record<string, RecoveryPart | "">,
+  // The part the composer will stamp on the next patch it adds. Sits beside
+  // the territory box rather than appearing after it: an administrator
+  // answering "which patch, which part" is answering one question, and a
+  // control that only exists once half of it is done reads as missing.
+  pendingPart: "" as RecoveryPart | "",
+  // What is currently typed in the territory box.
+  //
+  // In state rather than left in an uncontrolled input, because the typed
+  // text IS a territory the moment somebody types it. Requiring Enter to
+  // "commit" it meant a form that plainly said Khulna could still be saved as
+  // having no territory at all, and the officer filling it in was told they
+  // had not entered one. Nobody should have to press a key to make what they
+  // can see be true.
+  territoryDraft: "",
   salesTerritory: "",
   portalId: "",
   isActive: true,
 };
 
-type SortKey = "name" | "staffId" | "role" | "territory";
+type SortKey = "name" | "staffId" | "role" | "territory" | "part";
 
 /**
  * The territory column, per role.
@@ -91,6 +116,56 @@ function territoryOf(u: AdminUser): string {
   // it appears.
   return postingLine(u.postings);
 }
+/**
+ * The recovery part, as one letter.
+ *
+ * ONLY EVER "A" OR "B", and only for the recovery desk. Part describes which
+ * half of the recovery organisation a patch sits in, so it means nothing
+ * against a sales officer working a different map entirely, and nothing
+ * against an engineer who works a bench and no map at all. Those rows get a
+ * dash rather than a blank, so the column reads as "not applicable" instead of
+ * "nobody has filled this in".
+ *
+ * Taken from the patch they are BASED in, not from every patch they hold. An
+ * officer covering a neighbouring patch may be standing in across the part
+ * boundary, and the honest answer to "which part is this person" is the one
+ * they belong to — the cover is visible in the Territory column beside it.
+ */
+/**
+ * Fold whatever is typed in the territory box into the list of patches.
+ *
+ * The typed text is a territory. This is the only place that becomes true, so
+ * Enter, the add button and the save path all call it and none of them can
+ * disagree about what the form currently says.
+ *
+ * Returns the form unchanged when there is nothing to fold, so calling it
+ * twice — Enter and then save — cannot add a patch twice.
+ */
+function commitDraft(f: FormState): FormState {
+  const name = f.territoryDraft.trim();
+  if (!name) return f;
+  if (f.territoryNames.includes(name)) {
+    return { ...f, territoryDraft: "" };
+  }
+  const next = [...f.territoryNames, name];
+  return {
+    ...f,
+    territoryNames: next,
+    baseTerritoryName: f.baseTerritoryName || next[0],
+    territoryParts: { ...f.territoryParts, [name]: f.pendingPart },
+    // Cleared after use: the next patch is a fresh question, and carrying the
+    // last answer forward is how every officer ends up in part A.
+    pendingPart: "",
+    territoryDraft: "",
+  };
+}
+
+function partOf(u: AdminUser): "A" | "B" | null {
+  if (u.role !== "RECOVERY_TEAM" && u.role !== "RECOVERY_MANAGER") return null;
+  const base = u.postings.find((p) => p.kind === "BASE") ?? u.postings[0];
+  return base?.territory.part ?? null;
+}
+
 type StatusFilter = "all" | "active" | "inactive";
 
 function initials(name: string): string {
@@ -247,6 +322,11 @@ export default function UsersAdminPage() {
         case "territory":
           cmp = territoryOf(a).localeCompare(territoryOf(b));
           break;
+        case "part":
+          // Rows with no part sort last in either direction: a dash is the
+          // absence of an answer, not an answer that comes after B.
+          cmp = (partOf(a) ?? "Z").localeCompare(partOf(b) ?? "Z");
+          break;
       }
       return sortAsc ? cmp : -cmp;
     });
@@ -273,8 +353,14 @@ export default function UsersAdminPage() {
       staffId: u.staffId,
       designation: u.designation ?? "",
       role: u.role,
-      territoryIds: u.postings.map((p) => p.territoryId),
-      baseTerritoryId: u.postings.find((p) => p.kind === "BASE")?.territoryId ?? "",
+      territoryNames: u.postings.map((p) => p.territory.name),
+      baseTerritoryName:
+        u.postings.find((p) => p.kind === "BASE")?.territory.name ?? "",
+      territoryParts: Object.fromEntries(
+        u.postings.map((p) => [p.territory.name, p.territory.part ?? ""]),
+      ),
+      pendingPart: "" as RecoveryPart | "",
+      territoryDraft: "",
       salesTerritory: u.salesTerritory ?? "",
       portalId: u.portalId ?? "",
       isActive: u.isActive,
@@ -291,7 +377,32 @@ export default function UsersAdminPage() {
     // Manager sees them under either part.
     // The same rule the API enforces, so the admin reads it before the round
     // trip rather than after it — and it is the API's own message.
-    const posting = postingError(form.role, form.territoryIds, form.baseTerritoryId || null);
+    // Part is required on the recovery desk, and the message names the patch
+    // that is missing one rather than saying "part is required" over a form
+    // holding three of them.
+    // What is typed counts. Folded here rather than trusting that Enter was
+    // pressed — and folded into a LOCAL value, because setForm is async and
+    // validating `form` a line later would still read the pre-commit list.
+    const f = commitDraft(form);
+    if (f !== form) setForm(f);
+
+    if (f.role === "RECOVERY_TEAM") {
+      const without = f.territoryNames.filter((n) => !f.territoryParts[n]);
+      if (without.length) {
+        setError(
+          without.length === 1
+            ? `Choose part A or B for ${without[0]}.`
+            : `Choose part A or B for ${without.join(", ")}.`,
+        );
+        return;
+      }
+    }
+
+    const posting = postingError(
+      f.role,
+      f.territoryNames,
+      f.baseTerritoryName || null,
+    );
     if (posting) {
       setError(posting);
       return;
@@ -301,8 +412,8 @@ export default function UsersAdminPage() {
     // before the round trip rather than after it. The message is the API's
     // own — one wording, one place.
     const pairing = portalPairingError(
-      form.role,
-      form.role === "PORTAL_VIEWER" ? form.portalId || null : null,
+      f.role,
+      f.role === "PORTAL_VIEWER" ? f.portalId || null : null,
     );
     if (pairing) {
       setError(pairing);
@@ -312,25 +423,31 @@ export default function UsersAdminPage() {
     setSaving(true);
     setError("");
     try {
+      // `f`, not `form` — the folded copy, which is the only one that knows
+      // about a patch typed but never Entered.
       const payload: Record<string, unknown> = {
-        name: form.name,
-        staffId: form.staffId,
-        designation: form.designation,
-        role: form.role,
-        territoryIds: form.territoryIds,
-        baseTerritoryId: form.baseTerritoryId || null,
+        name: f.name,
+        staffId: f.staffId,
+        designation: f.designation,
+        role: f.role,
+        territoryNames: f.territoryNames,
+        baseTerritoryName: f.baseTerritoryName || null,
+        territoryParts: f.territoryNames.map((name) => ({
+          name,
+          part: f.territoryParts[name] || null,
+        })),
         // Only ever sent for a sales officer. Changing someone's role away
         // from sales clears it, so a stale patch name cannot linger on an
         // engineer and turn up in the offer book.
-        salesTerritory: form.role === "SALES_TEAM" ? form.salesTerritory : "",
+        salesTerritory: f.role === "SALES_TEAM" ? f.salesTerritory : "",
         // Same argument as the sales patch above: sent as null for every other
         // role, so moving somebody off a portal actually detaches them rather
         // than leaving a lens attached to an account that no longer reads
         // through one.
-        portalId: form.role === "PORTAL_VIEWER" ? form.portalId || null : null,
+        portalId: f.role === "PORTAL_VIEWER" ? f.portalId || null : null,
       };
       if (editing) {
-        payload.isActive = form.isActive;
+        payload.isActive = f.isActive;
         await sendJSON(`/api/admin/users/${editing.id}`, "PATCH", payload);
         toast("User updated successfully");
       } else {
@@ -538,6 +655,7 @@ export default function UsersAdminPage() {
                     <SortHead label="Role" k="role" sortKey={sortKey} asc={sortAsc} onSort={toggleSort} />
                     <th>Designation</th>
                     <SortHead label="Territory" k="territory" sortKey={sortKey} asc={sortAsc} onSort={toggleSort} />
+                    <SortHead label="Part" k="part" sortKey={sortKey} asc={sortAsc} onSort={toggleSort} />
                     <th>Status</th>
                     <th className="text-right">Actions</th>
                   </tr>
@@ -545,7 +663,7 @@ export default function UsersAdminPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-14 text-center">
+                      <td colSpan={8} className="py-14 text-center">
                         <p className="text-sm font-medium text-ink-2">No users match these filters.</p>
                         <button className="btn btn-ghost btn-sm mt-3" onClick={clearFilters}>
                           Clear filters
@@ -576,6 +694,19 @@ export default function UsersAdminPage() {
                         <td>{ROLE_META[u.role].label}</td>
                         <td className="text-ink-3">{u.designation || "—"}</td>
                         <td className="text-ink-3">{territoryOf(u) || "—"}</td>
+                        <td>
+                          {partOf(u) ? (
+                            <span
+                              className="part-tag"
+                              data-part={partOf(u)}
+                              title={`Part ${partOf(u)} — based in ${territoryOf(u)}`}
+                            >
+                              {partOf(u)}
+                            </span>
+                          ) : (
+                            <span className="text-ink-3">—</span>
+                          )}
+                        </td>
                         <td>
                           {u.isActive ? <Chip tone="ok">Active</Chip> : <Chip tone="neutral">Inactive</Chip>}
                         </td>
@@ -707,52 +838,195 @@ export default function UsersAdminPage() {
                     second only appears once more than one is picked; with a
                     single territory there is nothing to choose and the base is
                     settled automatically. */}
-                <Labeled label={form.role === "RECOVERY_TEAM" ? "Territories *" : "Territories"}>
+                {/* RECOVERY ONLY. A sales officer's patch is `salesTerritory`
+                    below — free text, a different organisation, and never the
+                    same list. A service engineer works a bench, not a map.
+                    Hidden rather than disabled, and the state is still sent, so
+                    switching somebody's role never silently drops postings
+                    somebody set on purpose. */}
+                {form.role === "RECOVERY_TEAM" && (
+                <Labeled label="Territories &amp; part *">
+                  {/* Existing patches, plus whatever this form has named that
+                      does not exist yet — both are chips, because to the person
+                      filling the form they are the same thing. */}
                   <div className="flex flex-wrap gap-1.5">
-                    {territories.map((t) => {
-                      const on = form.territoryIds.includes(t.id);
+                    {[
+                      ...new Set([
+                        ...territories.map((t) => t.name),
+                        ...form.territoryNames,
+                      ]),
+                    ].map((name) => {
+                      const on = form.territoryNames.includes(name);
+                      const isNew = !territories.some((t) => t.name === name);
                       return (
                         <button
-                          key={t.id}
+                          key={name}
                           type="button"
                           className="po-chip"
                           data-on={on || undefined}
+                          title={isNew ? "New — will be created when you save" : undefined}
                           onClick={() => {
                             const next = on
-                              ? form.territoryIds.filter((x) => x !== t.id)
-                              : [...form.territoryIds, t.id];
+                              ? form.territoryNames.filter((x) => x !== name)
+                              : [...form.territoryNames, name];
                             setForm({
                               ...form,
-                              territoryIds: next,
+                              territoryNames: next,
                               // The first one picked is their base, and
                               // dropping the base hands it to whatever is left
                               // — so the pair is never in an impossible state
                               // between two clicks.
-                              baseTerritoryId: next.includes(form.baseTerritoryId)
-                                ? form.baseTerritoryId
+                              baseTerritoryName: next.includes(form.baseTerritoryName)
+                                ? form.baseTerritoryName
                                 : (next[0] ?? ""),
                             });
                           }}
                         >
-                          {t.name}
+                          {name}
+                          {isNew ? " +" : ""}
                         </button>
                       );
                     })}
                   </div>
 
-                  {form.territoryIds.length > 1 && (
+                  {/* Naming a patch is how a patch is created. There is no
+                      other screen to visit first, and no list to keep in step
+                      with the roster. */}
+                  {/* ONE ROW, TWO ANSWERS. The patch and its part are asked
+                      together because they are one decision — the part is a
+                      property of the patch being named, and a control that
+                      only appeared after the name was entered read to its user
+                      as a missing field. Enter stamps the selected part onto
+                      the patch it adds. */}
+                  <div className="mt-2 flex items-stretch gap-1.5">
+                    <input
+                      className="field min-w-0 flex-1"
+                      placeholder="Type a territory…"
+                      value={form.territoryDraft}
+                      onChange={(e) =>
+                        setForm({ ...form, territoryDraft: e.target.value, })
+                      }
+                      onKeyDown={(e) => {
+                        // Enter is a SHORTCUT for adding a second patch, not
+                        // the way a first one is entered. What is typed counts
+                        // whether or not this is ever pressed.
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        setForm(commitDraft(form));
+                      }}
+                    />
+                    {(["A", "B"] as const).map((part) => (
+                      <button
+                        key={part}
+                        type="button"
+                        className="po-chip shrink-0"
+                        data-on={form.pendingPart === part || undefined}
+                        title={`Part ${part}`}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            pendingPart: form.pendingPart === part ? "" : part,
+                          })
+                        }
+                      >
+                        {part}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* The way to add a SECOND patch, for the rare officer who
+                      covers one. The first needs no button at all — what is
+                      typed is already the answer — so this only appears once
+                      there is something to add alongside. */}
+                  {form.territoryDraft.trim() !== "" && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm mt-1.5"
+                      onClick={() => setForm(commitDraft(form))}
+                    >
+                      <Plus size={13} /> Add another patch
+                    </button>
+                  )}
+                  {/* Said before it is true, not after.
+                      The Part control only exists once a patch does, which
+                      made it invisible to anyone reading the empty form — they
+                      looked for a Part field, did not find one, and concluded
+                      it was missing. Naming the second step here costs one
+                      line and removes the whole confusion. */}
+                  {form.territoryNames.length === 0 && (
+                    <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
+                      Type the patch and pick <strong className="text-ink-2">A</strong> or{" "}
+                      <strong className="text-ink-2">B</strong>. One that does not exist yet is
+                      created when you save.
+                    </p>
+                  )}
+
+                  {/* Part, per patch. Written onto the TERRITORY, so it reads
+                      back the same for every officer posted there — and an
+                      administrator who sets it here has corrected the patch,
+                      not annotated this one person. */}
+                  {form.territoryNames.length > 0 && (
+                    <div className="mt-2.5 flex flex-col gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+                        Part
+                      </span>
+                      {form.territoryNames.map((name) => (
+                        <div key={name} className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-2">
+                            {name}
+                          </span>
+                          <div className="flex gap-1">
+                            {(["A", "B"] as const).map((part) => (
+                              <button
+                                key={part}
+                                type="button"
+                                className="po-chip"
+                                data-on={
+                                  form.territoryParts[name] === part || undefined
+                                }
+                                onClick={() =>
+                                  setForm({
+                                    ...form,
+                                    territoryParts: {
+                                      ...form.territoryParts,
+                                      // Clicking the part it already has clears
+                                      // it, which is the only way to say "not
+                                      // decided yet" once one has been set.
+                                      [name]:
+                                        form.territoryParts[name] === part ? "" : part,
+                                    },
+                                  })
+                                }
+                              >
+                                Part {part}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="text-[11px] leading-snug text-ink-3">
+                        Which half of the recovery organisation the patch belongs to. It
+                        belongs to the territory, not to this officer — set it once and every
+                        officer posted there reads the same.
+                      </p>
+                    </div>
+                  )}
+
+                  {form.territoryNames.length > 1 && (
                     <div className="mt-2.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
                         Based in
                       </span>
                       <select
                         className="field mt-1"
-                        value={form.baseTerritoryId}
-                        onChange={(e) => setForm({ ...form, baseTerritoryId: e.target.value })}
+                        value={form.baseTerritoryName}
+                        onChange={(e) =>
+                          setForm({ ...form, baseTerritoryName: e.target.value })
+                        }
                       >
-                        {form.territoryIds.map((id) => (
-                          <option key={id} value={id}>
-                            {territories.find((t) => t.id === id)?.name ?? id}
+                        {form.territoryNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
                           </option>
                         ))}
                       </select>
@@ -764,13 +1038,14 @@ export default function UsersAdminPage() {
                     </div>
                   )}
 
-                  {form.role === "RECOVERY_TEAM" && form.territoryIds.length <= 1 && (
+                  {form.territoryNames.length <= 1 && (
                     <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
                       At least one. This is what puts their captures on the coverage table — pick a
                       second if they are covering a patch nobody is posted to.
                     </p>
                   )}
                 </Labeled>
+                )}
               </div>
 
               {/* Sales runs its own map, drawn differently from the recovery

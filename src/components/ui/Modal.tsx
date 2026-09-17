@@ -73,7 +73,7 @@ export function Modal({
       aria-modal="true"
       aria-labelledby={labelledBy}
     >
-      <div className={`modal-panel ${maxWidth}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`modal-panel modal-panel-split ${maxWidth}`} onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>,
@@ -119,7 +119,7 @@ export function ModalHeader({
           : "var(--surface-3)";
 
   return (
-    <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-5">
+    <div className="modal-head flex items-start justify-between gap-3 px-5 pb-3 pt-5">
       <div className="flex items-start gap-3 min-w-0">
         {icon && (
           <span
@@ -149,13 +149,22 @@ export function ModalHeader({
   );
 }
 
+/**
+ * The scrolling part of a dialog.
+ *
+ * `modal-body` is what makes the footer reachable. The panel is a clipped flex
+ * column, and a flex child will not shrink below its content unless it is told
+ * to — so a form taller than the screen pushed the footer out of the panel and
+ * the panel's `overflow: hidden` cut it off. The Save button was not hidden by
+ * a z-index or a stray height; it was outside the box.
+ */
 export function ModalBody({ children }: { children: React.ReactNode }) {
-  return <div className="px-5 pb-4">{children}</div>;
+  return <div className="modal-body px-5 pb-4">{children}</div>;
 }
 
 export function ModalFooter({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-rule px-5 py-3.5">
+    <div className="modal-foot flex flex-wrap items-center justify-end gap-2.5 border-t border-rule px-5 py-3.5">
       {children}
     </div>
   );

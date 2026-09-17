@@ -1,10 +1,11 @@
-import { ok, withGuard } from "@/lib/api";
+import { ok, fail, withGuard } from "@/lib/api";
 import { requireRole } from "@/lib/session";
 import {
   RETENTION_DAYS,
   pendingPurge,
   purgeSoldVehiclePhotos,
 } from "@/lib/photoRetention";
+import { pendingOrphans, purgeOrphans, uploadDirPath } from "@/lib/uploadOrphans";
 
 export const runtime = "nodejs";
 
@@ -25,12 +26,39 @@ export const runtime = "nodejs";
  */
 export const GET = withGuard(async () => {
   await requireRole("SUPER_ADMIN");
-  const pending = await pendingPurge();
-  return ok({ retentionDays: RETENTION_DAYS, ...pending });
+  // Both reports, because they answer the same question — what is this
+  // directory holding that it should not be — and an admin looking at one
+  // wants the other. Neither call changes anything.
+  const [pending, orphans] = await Promise.all([pendingPurge(), pendingOrphans()]);
+  return ok({
+    retentionDays: RETENTION_DAYS,
+    ...pending,
+    uploadDir: uploadDirPath(),
+    orphans,
+  });
 });
 
-export const POST = withGuard(async () => {
+/**
+ * `?target=orphans` runs the unreferenced-file sweep instead of the retention
+ * one. A query parameter rather than a body because this endpoint has never
+ * taken one, and a POST that starts requiring JSON would break the existing
+ * caller for no gain.
+ *
+ * Defaulting to the retention purge keeps every current caller doing exactly
+ * what it did before. Both are destructive and irreversible; the orphan sweep
+ * re-derives its own list rather than trusting anything the GET returned.
+ */
+export const POST = withGuard(async (request: Request) => {
   await requireRole("SUPER_ADMIN");
+
+  const target = new URL(request.url).searchParams.get("target");
+  if (target === "orphans") {
+    return ok({ target: "orphans", ...(await purgeOrphans()) });
+  }
+  if (target && target !== "retention") {
+    return fail(`Unknown target: ${target}`, 400);
+  }
+
   const result = await purgeSoldVehiclePhotos();
-  return ok({ retentionDays: RETENTION_DAYS, ...result });
+  return ok({ target: "retention", retentionDays: RETENTION_DAYS, ...result });
 });

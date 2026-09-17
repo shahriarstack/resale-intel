@@ -4,7 +4,8 @@ import { ok, fail, withGuard } from "@/lib/api";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { portalPairingError } from "@/lib/portals";
-import { postingError } from "@/lib/postings";
+import { resolveTerritoryNames } from "@/lib/masterData";
+import { partError, postingError } from "@/lib/postings";
 import { userUpdateSchema } from "@/lib/validation";
 
 const publicSelect = {
@@ -83,9 +84,31 @@ export const PATCH = withGuard(
     // has been posted there. Deleting and recreating loses `assignedAt` on the
     // ones that survive, so those are left alone and only the difference is
     // written.
-    if (data.territoryIds !== undefined) {
-      const nextIds = data.territoryIds;
-      const nextBase = data.baseTerritoryId ?? null;
+    // Named patches are resolved to rows first, creating any that are new —
+    // the same rule as on create. An edit that moves an officer to a patch
+    // nobody has worked yet brings that patch into existence.
+    let namedIds: string[] | null = null;
+    let namedBase: string | null = null;
+    if (data.territoryNames !== undefined) {
+      const partMap = new Map(
+        (data.territoryParts ?? []).map((t) => [t.name.toLowerCase(), t.part]),
+      );
+      const resolved = await resolveTerritoryNames(data.territoryNames, partMap);
+      const missingPart = partError(
+        nextRole,
+        data.territoryNames,
+        partMap,
+      );
+      if (missingPart) return fail(missingPart, 422);
+      if ("error" in resolved) return fail(resolved.error, 422);
+      namedIds = resolved.ids;
+      const baseName = data.baseTerritoryName?.trim();
+      namedBase = baseName ? (resolved.idByName.get(baseName.toLowerCase()) ?? null) : null;
+    }
+
+    if (namedIds !== null || data.territoryIds !== undefined) {
+      const nextIds = namedIds ?? data.territoryIds ?? [];
+      const nextBase = namedIds !== null ? namedBase : (data.baseTerritoryId ?? null);
 
       const posting = postingError(nextRole, nextIds, nextBase);
       if (posting) return fail(posting, 422);

@@ -1,6 +1,6 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, VehicleStatus } from "@prisma/client";
 import { ok, fail, withGuard } from "@/lib/api";
-import { requireRole, requireUser } from "@/lib/session";
+import { requireRole, requireStaff } from "@/lib/session";
 import { territoryDenied } from "@/lib/postings";
 import { prisma } from "@/lib/prisma";
 import { captureSchema } from "@/lib/validation";
@@ -10,6 +10,7 @@ import { shortDate, taka } from "@/lib/format";
 import { resolveBrandModel } from "@/lib/masterData";
 import { intakeSourceForKind } from "@/lib/offroad";
 import { findAuthorisingWindow } from "@/lib/captureWindow";
+import { STATUS_META } from "@/lib/status";
 
 // Create a capture. Recovery Team (or Super Admin) only. Records the CAPTURED
 // audit event and an empty Costing row in the same transaction.
@@ -243,7 +244,7 @@ export const POST = withGuard(async (request: Request) => {
 
 // List vehicles, scoped by role. Field roles see only their own files.
 export const GET = withGuard(async (request: Request) => {
-  const user = await requireUser();
+  const user = await requireStaff();
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const q = searchParams.get("q")?.trim();
@@ -251,7 +252,25 @@ export const GET = withGuard(async (request: Request) => {
   const where: Prisma.VehicleWhereInput = {};
   if (user.role === "RECOVERY_TEAM") where.capturedById = user.id;
   else if (user.role === "SERVICE_ENGINEER") where.assignedEngineerId = user.id;
-  if (status) where.status = status as Prisma.VehicleWhereInput["status"];
+
+  // Checked against the status list rather than cast into the query.
+  //
+  // The cast that used to be here handed an arbitrary query string to Prisma,
+  // which rejects it with a PrismaClientValidationError — and that is not one
+  // of the three error types `withGuard` knows, so a mistyped status in a URL
+  // came back as a 500 and a stack trace in the log. The caller's fault
+  // deserves the caller's status code.
+  //
+  // Checked against STATUS_META rather than a list written out here: it is a
+  // `Record<VehicleStatus, …>`, so the compiler refuses it if a status is ever
+  // added to the enum and not to the map. A hand-written array would go stale
+  // silently and start rejecting a status the product had just gained.
+  if (status) {
+    if (!Object.hasOwn(STATUS_META, status)) {
+      return fail(`Unknown status: ${status}`, 400);
+    }
+    where.status = status as VehicleStatus;
+  }
 
   // Optional free-text search, used by the command palette. Additive: with no
   // `q` the response is byte-for-byte what it was before. Role scoping above

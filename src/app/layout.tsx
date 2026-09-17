@@ -79,6 +79,17 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Deliberately no maximumScale / user-scalable: capping zoom locks out
   // low-vision users, and the field teams work on small phones outdoors.
+  //
+  // `cover` is what makes the safe-area insets REAL. Nine rules across five
+  // stylesheets already position against `env(safe-area-inset-*)` — the dock,
+  // the storefront bars, the desk footer — and without this every one of them
+  // resolved to its 0px fallback. On a notched phone the dock was sitting
+  // under the home indicator and the top bar under the notch, which is most of
+  // what "it does not fit like an app" means.
+  //
+  // It also hands the app the full screen rather than a letterboxed strip
+  // between the system bars, which is the other half.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

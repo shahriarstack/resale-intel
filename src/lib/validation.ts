@@ -545,6 +545,35 @@ export const userCreateSchema = z.object({
    */
   territoryIds: z.array(z.string().trim().min(1)).max(20).default([]),
   baseTerritoryId: nullableId,
+  /**
+   * The same postings, named rather than picked.
+   *
+   * The territory list is not a thing anybody maintains separately — it is
+   * whatever the field force is posted to. An administrator adding an ARO
+   * types the patch that officer works, and if it is the first officer there,
+   * the patch comes into existence at that moment. When these are present
+   * they REPLACE the id fields above, which remain for the bulk import and for
+   * any caller that already holds ids.
+   */
+  territoryNames: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+  baseTerritoryName: z.string().trim().max(80).optional().or(z.literal("")),
+  /**
+   * Which half of the recovery organisation each named patch sits in.
+   *
+   * A property of the territory, not of the officer — two AROs on the same
+   * patch cannot disagree about its part — so this is applied to the row. A
+   * name with no entry here, or a null part, leaves whatever is already set
+   * alone rather than blanking it.
+   */
+  territoryParts: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(80),
+        part: z.enum(["A", "B"]).nullable(),
+      }),
+    )
+    .max(20)
+    .optional(),
   // The sales patch. Free text, and only meaningful on a sales officer — the
   // form hides it for every other role rather than storing a value nobody
   // will ever read.
@@ -580,6 +609,27 @@ export const userImportRowSchema = z.object({
   territory: z.string().trim().max(80).optional().or(z.literal("")),
   /** The sales patch. Free text, and only meaningful on a sales officer. */
   salesTerritory: z.string().trim().max(80).optional().or(z.literal("")),
+  /**
+   * Which half of the recovery organisation the territory belongs to.
+   *
+   * Typed by a person into a spreadsheet, so it is read generously: "A",
+   * "a", "Part A" and "part-a" all mean part A. Being strict here would
+   * reject a file over a word nobody was asked to omit, and the value is a
+   * single letter either way.
+   *
+   * A property of the TERRITORY, not of this officer — see
+   * resolveTerritoryNames — so two rows naming the same patch must agree
+   * about it. The import checks that rather than letting the last row win.
+   */
+  part: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => {
+      const t = (v ?? "").trim().toUpperCase().replace(/^PART[\s\-_]*/, "");
+      return t === "A" || t === "B" ? (t as "A" | "B") : null;
+    }),
 });
 
 export const userImportSchema = z
@@ -618,6 +668,26 @@ export const userUpdateSchema = z.object({
   role: z.enum(ROLE_VALUES).optional(),
   territoryIds: z.array(z.string().trim().min(1)).max(20).optional(),
   baseTerritoryId: nullableId,
+  // Named postings, as on create. Present, they replace the ids above.
+  territoryNames: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+  baseTerritoryName: z.string().trim().max(80).optional().or(z.literal("")),
+  /**
+   * Which half of the recovery organisation each named patch sits in.
+   *
+   * A property of the territory, not of the officer — two AROs on the same
+   * patch cannot disagree about its part — so this is applied to the row. A
+   * name with no entry here, or a null part, leaves whatever is already set
+   * alone rather than blanking it.
+   */
+  territoryParts: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(80),
+        part: z.enum(["A", "B"]).nullable(),
+      }),
+    )
+    .max(20)
+    .optional(),
   salesTerritory: z.string().trim().max(80).optional().or(z.literal("")),
   isActive: z.boolean().optional(),
   portalId: nullableId,
@@ -1205,3 +1275,56 @@ export const portalUpdateSchema = z
     message: "A portal needs at least one panel",
     path: ["modules"],
   });
+
+// ---------------------------------------------------------------------------
+// The administrator's records console
+// ---------------------------------------------------------------------------
+
+/**
+ * A deletion needs a reason, and the reason has to be a sentence.
+ *
+ * Twelve characters, because "test", "dup" and "wrong" are the three things
+ * somebody types when the field is merely required, and none of them answers
+ * the question that gets asked six months later. The reason outlives the
+ * record — it is the only part of it that does — so it is the one field here
+ * worth being awkward about.
+ */
+export const adminDeleteSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(12, "Say why, in a sentence — this is the only thing that survives the deletion")
+    .max(500),
+});
+
+/**
+ * Correcting a record's identity.
+ *
+ * Deliberately the identity fields and nothing else. Everything a DESK owns —
+ * costs, grades, prices, the stage itself — already has an audited path that
+ * enforces its own rules, and the Super Admin can already walk any of them
+ * because `canRunAction` lets them run any transition. Reaching around those
+ * to write the columns directly would be the one edit in the product that
+ * skipped its own state machine.
+ *
+ * What is left is the class of mistake those paths cannot fix: a registration
+ * number typed wrong on a phone in a yard, a customer code off by a digit, a
+ * vehicle filed under the wrong territory. Those are transcription errors, not
+ * decisions, and they have nowhere else to be corrected.
+ */
+export const adminCorrectSchema = z
+  .object({
+    registrationNo: z.string().trim().min(1).max(60).optional(),
+    customerName: z.string().trim().min(1).max(120).optional(),
+    customerCode: z.string().trim().max(60).optional().or(z.literal("")),
+    territoryId: nullableId.optional(),
+    reason: z.string().trim().max(500).optional().or(z.literal("")),
+  })
+  .refine(
+    (v) =>
+      v.registrationNo !== undefined ||
+      v.customerName !== undefined ||
+      v.customerCode !== undefined ||
+      v.territoryId !== undefined,
+    { message: "Nothing to change" },
+  );

@@ -1,5 +1,0 @@
----
-deployment:
-  tasks:
-    - export DEPLOYPATH=/home/cvacimot/public_html/resale.cv-acimotors.com
-    - /opt/alt/alt-nodejs24/root/usr/bin/npm install && /opt/alt/alt-nodejs24/root/usr/bin/npx prisma generate && /opt/alt/alt-nodejs24/root/usr/bin/npm run build && /bin/cp -a .next/standalone/. $DEPLOYPATH/ && /bin/cp -a .next/static $DEPLOYPATH/.next/static && /bin/cp -a public $DEPLOYPATH/public && mkdir -p $DEPLOYPATH/tmp && touch $DEPLOYPATH/tmp/restart.txt

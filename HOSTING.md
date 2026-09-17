@@ -96,9 +96,10 @@ DATABASE_URL=mysql://user:password@localhost:3306/dbname
 NEXTAUTH_SECRET=<48 random bytes, base64>
 NEXTAUTH_URL=https://resale.example.com
 UPLOAD_DIR=/home/<account>/resale-uploads
+TZ=Asia/Dhaka
 ```
 
-Four things about these:
+Five things about these:
 
 - **`NEXTAUTH_SECRET` is the only real secret in the system.** Anyone who knows
   it can mint a valid session for any role, including Super Admin. Generate it,
@@ -114,9 +115,108 @@ Four things about these:
   first: `mkdir -p /home/<account>/resale-uploads`.
 - **A password containing `]`, `)`, `@` or `/` must be percent-encoded** inside
   `DATABASE_URL`.
+- **`TZ` is not optional, and its absence is silent.** A Linux host runs in UTC
+  unless told otherwise; this business runs in Dhaka, six hours ahead. Node's
+  local-time methods then answer for the wrong day, and the product uses them
+  in forty-odd places — month keys, day buckets, "is this backdated".
+
+  What that looks like in practice: a vehicle sold at 02:30 on 1 October is
+  20:30 on 30 September in UTC, so `monthKey` files it under **September** and
+  the resale P&L reports it in the wrong month. A capture recorded before 06:00
+  is stamped "Backdated to yesterday" in its own audit trail. Worse, the
+  BROWSER is in Dhaka and the server is not, so for the first six hours of
+  every day the two disagree about what day it is — the officer's screen and
+  the record it writes do not match, and nothing errors.
+
+  None of this throws. It just quietly produces wrong dates, and every figure
+  derived from them inherits the error.
 
 If you keep a `.env` file instead, `update_env.ps1` writes one from environment
 variables and refuses an `UPLOAD_DIR` inside the deployment directory.
+
+### Staying inside the process limit
+
+A shared cPanel account has an **NPROC** ceiling — cPanel calls it *Number Of
+Processes*, and on CloudLinux it counts **tasks, meaning threads, not just
+processes**. This account's ceiling is 100, shared with five other sites. Hit
+it and nothing on the account can fork: PHP sites serve blank pages, cron stops,
+and the terminal itself stops working, which is what makes it confusing to
+diagnose — the tools you would reach for are the ones that break first.
+
+Node is thread-heavy by default and sizes several pools from the machine's CPU
+count. On a shared box that count is the *host's*, not your share of it, so the
+defaults are wildly too big here. Three settings do almost all the work, and
+all three belong in the Node.js App panel beside the four above:
+
+```
+UV_THREADPOOL_SIZE=2
+NODE_OPTIONS=--max-old-space-size=512 --v8-pool-size=2
+```
+
+- **`UV_THREADPOOL_SIZE`** caps libuv's pool, which serves filesystem and DNS
+  work. Default 4. This app's file I/O is photograph reads and writes, which are
+  not hot.
+- **`--v8-pool-size`** caps V8's compiler and GC helper threads. This is the one
+  that matters: the default is derived from the host's core count, so on a
+  24-core shared machine a single Node process can carry over twenty helper
+  threads that do nothing here but count against the ceiling.
+- **`--max-old-space-size`** is not about NPROC. It stops one runaway request
+  growing the heap until the LVE kills the process, which on this account would
+  look like the site randomly 500ing.
+
+The fourth setting goes on the connection string:
+
+```
+DATABASE_URL=mysql://user:pass@localhost:3306/dbname?connection_limit=5&pool_timeout=20
+```
+
+**Prisma's default pool is `physical_cpus * 2 + 1`** — again the host's cores,
+so tens of connections, each with a socket and the Rust query engine's own
+tokio workers behind it. Five is chosen deliberately rather than minimally: the
+heaviest screen in the product issues **nine** concurrent queries
+(`lib/coverage.ts`, the coverage board), and sixteen of the seventeen fan-outs
+in the codebase are `Promise.all`, which genuinely need a connection each. Five
+runs that board in two waves instead of one. Lower it further and the desks get
+visibly slower; raise it and you are spending the account's ceiling on
+connections that sit idle.
+
+Nothing in the application spawns processes of its own — there is no
+`child_process`, no `worker_threads`, no `cluster` anywhere in `src/`. If the
+task count climbs, it is either Passenger holding more app instances than it
+needs, or something you ran by hand. **`npm install` on this host is the
+classic one**: it forks aggressively, and on an account already near the
+ceiling it deadlocks, leaving stuck processes that hold the limit until they
+are killed. Install nothing on the server — the release ships complete, and
+schema SQL is generated on a workstation with `prisma migrate diff`.
+
+### One method, never both
+
+**Manage the app through the cPanel Node.js interface, or through the terminal
+with a process manager. Never mix them.** This is the host's own rule, and it
+was learned the expensive way.
+
+cPanel's app manager only tracks processes it started itself. A Node process
+launched from the terminal — and `npm`, `npx` and `prisma` all launch Node —
+is invisible to it. **Stop and Restart in the panel will not close it.** It
+keeps running, holds its slots, and the next one accumulates on top, until the
+account hits NPROC and everything on it stops: sibling sites serve blank pages,
+cron dies, cPanel's own pages hang, and the terminal answers
+
+```
+cagefs_enter: Unable to fork
+```
+
+which is the trap closing — the tool you would use to clear it is the tool that
+can no longer start. Clearing it then needs the host, because only they can
+reach the processes from outside the cage.
+
+This is the second reason the release ships complete and schema SQL is built on
+a workstation. The first is that `npm install` forks hard; this one is worse,
+because its damage is silent and cumulative and survives every restart you
+think fixed it.
+
+If the app ever does need managing from a shell, take it out of the cPanel
+Node.js interface entirely and run it under PM2 — one owner, not two.
 
 ---
 

@@ -14,19 +14,12 @@ import {
   EyeOff,
   Truck,
   CornerDownRight,
-  AlertTriangle,
 } from "lucide-react";
 import { getJSON, sendJSON } from "@/lib/http";
+import type { TerritoryMap } from "@/lib/territoryMap";
 import { Chip } from "@/components/ui/Chip";
 import { useToast } from "@/components/ui/Toast";
 
-interface Territory {
-  id: string;
-  name: string;
-  code: string | null;
-  part: "A" | "B" | null;
-  isActive: boolean;
-}
 interface Location { id: string; name: string; type: string; isActive: boolean }
 interface Question { id: string; key: string; label: string; requiresNote: boolean; sortOrder: number; isActive: boolean }
 interface VehicleModel { id: string; name: string; isActive: boolean; sortOrder: number }
@@ -269,123 +262,162 @@ function Row({
 
 // ---------------------------------------------------------------------------
 
+/**
+ * The two maps, read rather than maintained.
+ *
+ * This used to be an add/rename/hide list, and the list was the problem: a
+ * patch could sit in it for a year with nobody posted to it and nothing said
+ * so, while an officer could be posted to a patch nobody had ever classified.
+ * Two records of the same fact, free to disagree.
+ *
+ * Both halves are now DERIVED FROM THE ROSTER, which is the thing that is
+ * true. A recovery patch exists because an officer is posted to it; a sales
+ * patch exists because a sales officer is assigned to it. Everything here is
+ * set in the users console, so this panel leads with the EXCEPTIONS — the
+ * patches nobody works and the ones nobody has put in a part — because that is
+ * the only thing a reader can act on.
+ *
+ * Recovery and sales are shown side by side and never merged. They are
+ * different organisations drawing different maps; a name appearing in both is
+ * a coincidence, and joining on it would invent a relationship the business
+ * does not have.
+ */
 function TerritorySection() {
-  const { toast } = useToast();
-  const { items, loading, load } = useList<Territory>("/api/admin/territories");
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [part, setPart] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [showHidden, setShowHidden] = useState(true);
+  const [map, setMap] = useState<TerritoryMap | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const hidden = items.filter((t) => !t.isActive).length;
-  const unparted = items.filter((t) => t.isActive && !t.part).length;
-  const visible = useMemo(
-    () => (showHidden ? items : items.filter((t) => t.isActive)),
-    [items, showHidden],
-  );
-
-  const add = async () => {
-    if (!name.trim()) return;
-    setBusy(true);
-    try {
-      await sendJSON("/api/admin/territories", "POST", { name, code, part: part || null });
-      setName(""); setCode(""); setPart("");
-      toast(`Territory "${name}" added`);
-      await load();
-    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "bad"); }
-    finally { setBusy(false); }
-  };
-  const rename = async (t: Territory, value: string) => {
-    try {
-      await sendJSON(`/api/admin/territories/${t.id}`, "PATCH", { name: value });
-      toast(`Renamed to "${value}"`);
-      await load();
-    } catch (e) { toast(e instanceof Error ? e.message : "Rename failed", "bad"); }
-  };
-  const setTerritoryPart = async (t: Territory, value: string) => {
-    try {
-      await sendJSON(`/api/admin/territories/${t.id}`, "PATCH", { part: value || null });
-      toast(value ? `${t.name} moved to Part ${value}` : `${t.name} cleared`);
-      await load();
-    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "bad"); }
-  };
-  const toggle = async (t: Territory) => {
-    await sendJSON(`/api/admin/territories/${t.id}`, "PATCH", { isActive: !t.isActive });
-    toast(`${t.name} ${t.isActive ? "hidden" : "shown"}`);
-    await load();
-  };
-  const del = async (t: Territory) => {
-    if (confirm(`Delete territory "${t.name}"?`)) {
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
       try {
-        await sendJSON(`/api/admin/territories/${t.id}`, "DELETE");
-        toast(`Territory "${t.name}" deleted`);
-        await load();
-      } catch (e) { toast(e instanceof Error ? e.message : "Failed", "bad"); }
-    }
-  };
+        const data = await getJSON<TerritoryMap>("/api/admin/territory-map");
+        if (alive) setMap(data);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const t = map?.totals;
 
   return (
     <Card
       icon={<MapPin size={17} />}
       title="Territories"
-      subtitle="Sales territories, each owned by one half of the recovery organisation."
-      count={items.length}
-      hidden={hidden}
-      showHidden={showHidden}
-      onToggleHidden={() => setShowHidden(!showHidden)}
+      subtitle="Derived from the roster — post an officer in Users and their patch appears here."
+      count={(map?.totals.recovery ?? 0) + (map?.totals.sales ?? 0)}
+      hidden={0}
+      showHidden
+      onToggleHidden={() => {}}
       delay={0.04}
     >
-      <div className="mb-4 flex gap-2">
-        <input className="field" placeholder="Territory name" aria-label="New territory name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
-        <input className="field w-28" placeholder="Code" aria-label="Territory code (optional)" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
-        <select className="field w-32" aria-label="Recovery part" value={part} onChange={(e) => setPart(e.target.value)}>
-          <option value="">No part</option>
-          <option value="A">Part A</option>
-          <option value="B">Part B</option>
-        </select>
-        <button className="btn btn-primary shrink-0" onClick={add} disabled={busy || !name.trim()}>
-          {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-        </button>
-      </div>
-      {unparted > 0 && (
-        <p className="mb-3 flex items-center gap-1.5 text-[11.5px] text-warn">
-          <AlertTriangle size={12} className="shrink-0" />
-          {unparted} active {unparted === 1 ? "territory is" : "territories are"} not assigned to a
-          recovery part — they fall outside both Part A and Part B filters.
-        </p>
-      )}
-      {loading ? <SkeletonBlock /> : visible.length === 0 ? <Empty hidden={hidden > 0 && !showHidden} /> : (
-        <Rows>
-          {visible.map((t) => (
-            <Row
-              key={t.id}
-              main={t.name}
-              sub={t.code || undefined}
-              active={t.isActive}
-              onRename={(v) => rename(t, v)}
-              onToggle={() => toggle(t)}
-              onDelete={() => del(t)}
-              extra={
-                <select
-                  className="field h-8 w-[86px] px-2 py-0 text-xs"
-                  aria-label={`Recovery part for ${t.name}`}
-                  value={t.part ?? ""}
-                  onChange={(e) => setTerritoryPart(t, e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <option value="">—</option>
-                  <option value="A">Part A</option>
-                  <option value="B">Part B</option>
-                </select>
-              }
-            />
-          ))}
-        </Rows>
+      {loading && <p className="text-[13px] text-ink-3">Reading the roster…</p>}
+
+      {map && (
+        <>
+          {/* The exceptions, first and in plain language. */}
+          {t && (t.recoveryUnstaffed > 0 || t.recoveryUnparted > 0) && (
+            <div className="td-flags">
+              {t.recoveryUnstaffed > 0 && (
+                <span className="td-flag td-flag-warn">
+                  {t.recoveryUnstaffed} recovery patch
+                  {t.recoveryUnstaffed === 1 ? "" : "es"} with nobody posted
+                </span>
+              )}
+              {t.recoveryUnparted > 0 && (
+                <span className="td-flag">
+                  {t.recoveryUnparted} not in a part
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="td-maps">
+            {/* ---- Recovery ------------------------------------------- */}
+            <div className="td-map">
+              <div className="td-map-head">
+                <span className="td-map-title">Recovery</span>
+                <span className="td-map-count">{map.recovery.length}</span>
+              </div>
+              {map.recovery.length === 0 && (
+                <p className="td-none">
+                  None yet. Post a Recovery Team officer to a patch in Users and it appears
+                  here.
+                </p>
+              )}
+              {map.recovery.map((r) => (
+                <div key={r.id} className="td-row" data-warn={r.unstaffed || undefined}>
+                  <div className="td-row-main">
+                    <span className="td-name">{r.name}</span>
+                    {r.part ? (
+                      <span className="td-part">Part {r.part}</span>
+                    ) : (
+                      <span className="td-part td-part-none">No part</span>
+                    )}
+                    {!r.isActive && <span className="td-part td-part-none">Hidden</span>}
+                  </div>
+                  <div className="td-row-sub">
+                    {r.unstaffed ? (
+                      <span className="td-warn">Nobody posted</span>
+                    ) : (
+                      <>
+                        {r.officers.map((o) => (
+                          <span
+                            key={o.id}
+                            className="td-officer"
+                            data-cover={o.kind === "COVER" || undefined}
+                            title={o.kind === "BASE" ? "Based here" : "Covering"}
+                          >
+                            {o.name}
+                          </span>
+                        ))}
+                        {r.coveredOnly && <span className="td-warn">covered only</span>}
+                      </>
+                    )}
+                    {r.vehicles > 0 && (
+                      <span className="td-count">{r.vehicles} vehicle{r.vehicles === 1 ? "" : "s"}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ---- Sales ---------------------------------------------- */}
+            <div className="td-map">
+              <div className="td-map-head">
+                <span className="td-map-title">Sales</span>
+                <span className="td-map-count">{map.sales.length}</span>
+              </div>
+              {map.sales.length === 0 && (
+                <p className="td-none">
+                  None yet. Give a Sales Team officer a sales territory in Users.
+                </p>
+              )}
+              {map.sales.map((s) => (
+                <div key={s.name} className="td-row">
+                  <div className="td-row-main">
+                    <span className="td-name">{s.name}</span>
+                  </div>
+                  <div className="td-row-sub">
+                    {s.officers.map((o) => (
+                      <span key={o.id} className="td-officer">
+                        {o.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </Card>
   );
 }
+
 
 function LocationSection() {
   const { toast } = useToast();
