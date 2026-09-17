@@ -118,6 +118,61 @@ Four things about these:
 If you keep a `.env` file instead, `update_env.ps1` writes one from environment
 variables and refuses an `UPLOAD_DIR` inside the deployment directory.
 
+### Staying inside the process limit
+
+A shared cPanel account has an **NPROC** ceiling — cPanel calls it *Number Of
+Processes*, and on CloudLinux it counts **tasks, meaning threads, not just
+processes**. This account's ceiling is 100, shared with five other sites. Hit
+it and nothing on the account can fork: PHP sites serve blank pages, cron stops,
+and the terminal itself stops working, which is what makes it confusing to
+diagnose — the tools you would reach for are the ones that break first.
+
+Node is thread-heavy by default and sizes several pools from the machine's CPU
+count. On a shared box that count is the *host's*, not your share of it, so the
+defaults are wildly too big here. Three settings do almost all the work, and
+all three belong in the Node.js App panel beside the four above:
+
+```
+UV_THREADPOOL_SIZE=2
+NODE_OPTIONS=--max-old-space-size=512 --v8-pool-size=2
+```
+
+- **`UV_THREADPOOL_SIZE`** caps libuv's pool, which serves filesystem and DNS
+  work. Default 4. This app's file I/O is photograph reads and writes, which are
+  not hot.
+- **`--v8-pool-size`** caps V8's compiler and GC helper threads. This is the one
+  that matters: the default is derived from the host's core count, so on a
+  24-core shared machine a single Node process can carry over twenty helper
+  threads that do nothing here but count against the ceiling.
+- **`--max-old-space-size`** is not about NPROC. It stops one runaway request
+  growing the heap until the LVE kills the process, which on this account would
+  look like the site randomly 500ing.
+
+The fourth setting goes on the connection string:
+
+```
+DATABASE_URL=mysql://user:pass@localhost:3306/dbname?connection_limit=5&pool_timeout=20
+```
+
+**Prisma's default pool is `physical_cpus * 2 + 1`** — again the host's cores,
+so tens of connections, each with a socket and the Rust query engine's own
+tokio workers behind it. Five is chosen deliberately rather than minimally: the
+heaviest screen in the product issues **nine** concurrent queries
+(`lib/coverage.ts`, the coverage board), and sixteen of the seventeen fan-outs
+in the codebase are `Promise.all`, which genuinely need a connection each. Five
+runs that board in two waves instead of one. Lower it further and the desks get
+visibly slower; raise it and you are spending the account's ceiling on
+connections that sit idle.
+
+Nothing in the application spawns processes of its own — there is no
+`child_process`, no `worker_threads`, no `cluster` anywhere in `src/`. If the
+task count climbs, it is either Passenger holding more app instances than it
+needs, or something you ran by hand. **`npm install` on this host is the
+classic one**: it forks aggressively, and on an account already near the
+ceiling it deadlocks, leaving stuck processes that hold the limit until they
+are killed. Install nothing on the server — the release ships complete, and
+schema SQL is generated on a workstation with `prisma migrate diff`.
+
 ---
 
 ## Step 4 — The database
