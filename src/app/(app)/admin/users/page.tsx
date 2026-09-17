@@ -80,7 +80,7 @@ const blank = {
   isActive: true,
 };
 
-type SortKey = "name" | "staffId" | "role" | "territory";
+type SortKey = "name" | "staffId" | "role" | "territory" | "part";
 
 /**
  * The territory column, per role.
@@ -99,6 +99,27 @@ function territoryOf(u: AdminUser): string {
   // it appears.
   return postingLine(u.postings);
 }
+/**
+ * The recovery part, as one letter.
+ *
+ * ONLY EVER "A" OR "B", and only for the recovery desk. Part describes which
+ * half of the recovery organisation a patch sits in, so it means nothing
+ * against a sales officer working a different map entirely, and nothing
+ * against an engineer who works a bench and no map at all. Those rows get a
+ * dash rather than a blank, so the column reads as "not applicable" instead of
+ * "nobody has filled this in".
+ *
+ * Taken from the patch they are BASED in, not from every patch they hold. An
+ * officer covering a neighbouring patch may be standing in across the part
+ * boundary, and the honest answer to "which part is this person" is the one
+ * they belong to — the cover is visible in the Territory column beside it.
+ */
+function partOf(u: AdminUser): "A" | "B" | null {
+  if (u.role !== "RECOVERY_TEAM" && u.role !== "RECOVERY_MANAGER") return null;
+  const base = u.postings.find((p) => p.kind === "BASE") ?? u.postings[0];
+  return base?.territory.part ?? null;
+}
+
 type StatusFilter = "all" | "active" | "inactive";
 
 function initials(name: string): string {
@@ -254,6 +275,11 @@ export default function UsersAdminPage() {
           break;
         case "territory":
           cmp = territoryOf(a).localeCompare(territoryOf(b));
+          break;
+        case "part":
+          // Rows with no part sort last in either direction: a dash is the
+          // absence of an answer, not an answer that comes after B.
+          cmp = (partOf(a) ?? "Z").localeCompare(partOf(b) ?? "Z");
           break;
       }
       return sortAsc ? cmp : -cmp;
@@ -558,6 +584,7 @@ export default function UsersAdminPage() {
                     <SortHead label="Role" k="role" sortKey={sortKey} asc={sortAsc} onSort={toggleSort} />
                     <th>Designation</th>
                     <SortHead label="Territory" k="territory" sortKey={sortKey} asc={sortAsc} onSort={toggleSort} />
+                    <SortHead label="Part" k="part" sortKey={sortKey} asc={sortAsc} onSort={toggleSort} />
                     <th>Status</th>
                     <th className="text-right">Actions</th>
                   </tr>
@@ -565,7 +592,7 @@ export default function UsersAdminPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-14 text-center">
+                      <td colSpan={8} className="py-14 text-center">
                         <p className="text-sm font-medium text-ink-2">No users match these filters.</p>
                         <button className="btn btn-ghost btn-sm mt-3" onClick={clearFilters}>
                           Clear filters
@@ -596,6 +623,19 @@ export default function UsersAdminPage() {
                         <td>{ROLE_META[u.role].label}</td>
                         <td className="text-ink-3">{u.designation || "—"}</td>
                         <td className="text-ink-3">{territoryOf(u) || "—"}</td>
+                        <td>
+                          {partOf(u) ? (
+                            <span
+                              className="part-tag"
+                              data-part={partOf(u)}
+                              title={`Part ${partOf(u)} — based in ${territoryOf(u)}`}
+                            >
+                              {partOf(u)}
+                            </span>
+                          ) : (
+                            <span className="text-ink-3">—</span>
+                          )}
+                        </td>
                         <td>
                           {u.isActive ? <Chip tone="ok">Active</Chip> : <Chip tone="neutral">Inactive</Chip>}
                         </td>

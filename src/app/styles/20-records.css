@@ -583,3 +583,36 @@
     }
   }
 }
+
+/* ==========================================================================
+   Users list → Part
+
+   One letter in a dense table, so it is given a plate rather than left to
+   float as text. A and B are tinted differently on purpose: the Recovery
+   Manager reads this column to see how the field force is split, and two
+   letters in identical grey make that a counting exercise instead of a glance.
+   ========================================================================== */
+
+@layer components {
+  .part-tag {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+    color: var(--accent);
+  }
+
+  /* B takes the warm side of the palette. Nothing is wrong with part B — the
+     two simply have to be told apart without reading. */
+  .part-tag[data-part="B"] {
+    background: color-mix(in oklab, var(--warn) 20%, transparent);
+    color: var(--warn);
+  }
+}
