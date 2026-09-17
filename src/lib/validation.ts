@@ -1205,3 +1205,56 @@ export const portalUpdateSchema = z
     message: "A portal needs at least one panel",
     path: ["modules"],
   });
+
+// ---------------------------------------------------------------------------
+// The administrator's records console
+// ---------------------------------------------------------------------------
+
+/**
+ * A deletion needs a reason, and the reason has to be a sentence.
+ *
+ * Twelve characters, because "test", "dup" and "wrong" are the three things
+ * somebody types when the field is merely required, and none of them answers
+ * the question that gets asked six months later. The reason outlives the
+ * record — it is the only part of it that does — so it is the one field here
+ * worth being awkward about.
+ */
+export const adminDeleteSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(12, "Say why, in a sentence — this is the only thing that survives the deletion")
+    .max(500),
+});
+
+/**
+ * Correcting a record's identity.
+ *
+ * Deliberately the identity fields and nothing else. Everything a DESK owns —
+ * costs, grades, prices, the stage itself — already has an audited path that
+ * enforces its own rules, and the Super Admin can already walk any of them
+ * because `canRunAction` lets them run any transition. Reaching around those
+ * to write the columns directly would be the one edit in the product that
+ * skipped its own state machine.
+ *
+ * What is left is the class of mistake those paths cannot fix: a registration
+ * number typed wrong on a phone in a yard, a customer code off by a digit, a
+ * vehicle filed under the wrong territory. Those are transcription errors, not
+ * decisions, and they have nowhere else to be corrected.
+ */
+export const adminCorrectSchema = z
+  .object({
+    registrationNo: z.string().trim().min(1).max(60).optional(),
+    customerName: z.string().trim().min(1).max(120).optional(),
+    customerCode: z.string().trim().max(60).optional().or(z.literal("")),
+    territoryId: nullableId.optional(),
+    reason: z.string().trim().max(500).optional().or(z.literal("")),
+  })
+  .refine(
+    (v) =>
+      v.registrationNo !== undefined ||
+      v.customerName !== undefined ||
+      v.customerCode !== undefined ||
+      v.territoryId !== undefined,
+    { message: "Nothing to change" },
+  );

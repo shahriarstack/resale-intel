@@ -1,0 +1,423 @@
+/* ==========================================================================
+   Administration → Records
+
+   The console that can delete. Its visual job is to slow the hand down at
+   exactly one point — the selection bar and the confirm dialog — while keeping
+   searching and filtering fast, because an administrator who cannot find the
+   record quickly will widen the filter until they can, and a wide filter is
+   what makes a bulk delete dangerous.
+   ========================================================================== */
+
+@layer components {
+  .rc {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    /* Room for the selection bar, which is fixed and would otherwise cover the
+       last rows of the table — the rows most likely to be the ones selected. */
+    padding-bottom: 72px;
+  }
+
+  /* ---- Search ---------------------------------------------------------- */
+
+  .rc-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .rc-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+    height: 38px;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--surface-1);
+  }
+
+  .rc-search:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
+  }
+
+  .rc-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    font-size: 14px;
+    color: var(--ink-1);
+    outline: none;
+  }
+
+  .rc-clear {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    color: var(--ink-3);
+  }
+  .rc-clear:hover {
+    background: var(--surface-2);
+    color: var(--ink-1);
+  }
+
+  /* ---- Filters --------------------------------------------------------- */
+
+  .rc-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--surface-1);
+  }
+
+  .rc-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rc-filter-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    min-width: 62px;
+  }
+  .rc-filter-label-2 {
+    min-width: 0;
+    margin-left: 10px;
+  }
+
+  .rc-filters select,
+  .rc-filters input[type="date"] {
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface-2);
+    font-size: 13px;
+    color: var(--ink-1);
+  }
+
+  .rc-dash {
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  .rc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .rc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--surface-2);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    transition:
+      background 120ms,
+      border-color 120ms,
+      color 120ms;
+  }
+  .rc-chip:hover {
+    color: var(--ink-1);
+    border-color: color-mix(in oklab, var(--accent) 40%, var(--rule));
+  }
+  .rc-chip.is-on {
+    background: color-mix(in oklab, var(--accent) 16%, var(--surface-2));
+    border-color: var(--accent);
+    color: var(--ink-1);
+  }
+  .rc-chip-sm {
+    height: 25px;
+    padding: 0 9px;
+    font-size: 11.5px;
+  }
+  .rc-chip-n {
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+
+  .rc-stage-groups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .rc-stage-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .rc-stage-head {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* ---- Summary and table ----------------------------------------------- */
+
+  .rc-summary {
+    font-size: 12.5px;
+  }
+  .rc-muted {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-3);
+  }
+
+  .rc-table-wrap {
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    overflow: auto;
+    background: var(--surface-1);
+  }
+
+  .rc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .rc-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 9px 10px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  .rc-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--ink-2);
+  }
+
+  .rc-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .rc-table tbody tr:hover td {
+    background: var(--surface-2);
+  }
+  .rc-table tr.is-selected td {
+    background: color-mix(in oklab, var(--accent) 10%, var(--surface-1));
+  }
+
+  .rc-check {
+    width: 34px;
+    padding-left: 12px !important;
+  }
+
+  .rc-label {
+    font-weight: 600;
+    color: var(--ink-1);
+    letter-spacing: 0.01em;
+  }
+  .rc-sub {
+    margin-top: 1px;
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+
+  /* A record that cannot be deleted says so where it is selected, not in the
+     failure report afterwards. */
+  .rc-blocked {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--warn);
+  }
+
+  .rc-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rc-actions {
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .rc-empty {
+    padding: 28px 12px !important;
+    text-align: center;
+    color: var(--ink-3);
+  }
+
+  /* ---- Selection bar --------------------------------------------------- */
+
+  .rc-selbar {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 12px 9px 16px;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--surface-1);
+    box-shadow: 0 10px 34px rgb(0 0 0 / 0.34);
+  }
+
+  .rc-selcount {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-1);
+    white-space: nowrap;
+  }
+  .rc-selnote {
+    font-size: 11.5px;
+    color: var(--warn);
+    white-space: nowrap;
+  }
+  .rc-selactions {
+    display: flex;
+    gap: 6px;
+  }
+
+  /* ---- Confirm --------------------------------------------------------- */
+
+  .rc-confirm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    max-height: 190px;
+    overflow: auto;
+  }
+  .rc-confirm-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 8px;
+    border-radius: 7px;
+    background: var(--surface-2);
+    font-size: 12.5px;
+  }
+  .rc-confirm-list strong {
+    color: var(--ink-1);
+  }
+  .rc-confirm-list span {
+    color: var(--ink-3);
+  }
+
+  /* The total this act destroys, stated before the button and not after. */
+  .rc-cascade {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 10px;
+    margin-bottom: 12px;
+    border: 1px solid color-mix(in oklab, var(--danger) 40%, var(--rule));
+    border-radius: 9px;
+    background: color-mix(in oklab, var(--danger) 10%, transparent);
+    font-size: 12.5px;
+    color: var(--ink-1);
+  }
+
+  .rc-reason,
+  .rc-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 12px;
+  }
+  .rc-reason > span,
+  .rc-field > span {
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .rc-reason textarea,
+  .rc-field input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 9px;
+    background: var(--surface-2);
+    font-size: 13.5px;
+    color: var(--ink-1);
+    resize: vertical;
+  }
+  .rc-reason textarea:focus,
+  .rc-field input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
+  }
+
+  .rc-progress {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+
+  .rc-failures {
+    margin-top: 10px;
+    padding: 9px 10px;
+    border: 1px solid color-mix(in oklab, var(--danger) 40%, var(--rule));
+    border-radius: 9px;
+    font-size: 12.5px;
+  }
+  .rc-failures ul {
+    margin-top: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--ink-2);
+  }
+  .rc-failures span {
+    color: var(--ink-1);
+    font-weight: 600;
+  }
+
+  /* ---- Narrow ---------------------------------------------------------- */
+
+  @media (max-width: 860px) {
+    .rc-filter-label {
+      min-width: 0;
+      width: 100%;
+    }
+    .rc-selbar {
+      left: 12px;
+      right: 12px;
+      transform: none;
+      justify-content: space-between;
+    }
+  }
+}

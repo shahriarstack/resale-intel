@@ -1,21 +1,22 @@
 import type { Role } from "@prisma/client";
 import {
-  LayoutDashboard,
-  Store,
-  Users,
-  Database,
-  Map,
-  Wrench,
-  LayoutList,
-  Gavel,
-  TriangleAlert,
-  FileClock,
-  MailWarning,
-  Truck,
   BadgeDollarSign,
-  Unlock,
-  Eye,
+  Database,
   Download,
+  Eye,
+  FileClock,
+  FileSearch,
+  Gavel,
+  LayoutDashboard,
+  LayoutList,
+  MailWarning,
+  Map,
+  Store,
+  TriangleAlert,
+  Truck,
+  Unlock,
+  Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -225,6 +226,15 @@ export function getNavItems(role: Role): NavItem[] {
         // insight: composing a portal is a decision about who may read the
         // system, not a reading of it.
         { href: "/admin/portals", label: "Portals", icon: Eye, group: "setup" },
+        // Last in the group, and deliberately so: it is the only entry here
+        // that can remove a record rather than configure one, and a list is
+        // read top to bottom.
+        {
+          href: "/admin/records",
+          label: "Records",
+          icon: FileSearch,
+          group: "setup",
+        },
       ];
     case "SR_EXECUTIVE":
       return [dashboard, resale, register, salesMargin, coverage, dataRoom];

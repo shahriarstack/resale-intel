@@ -360,6 +360,10 @@ model User {
   windowsOpened    CaptureWindow[]        @relation("OpenedWindows")
   windowsClosed    CaptureWindow[]        @relation("ClosedWindows")
   portalsCreated   Portal[]               @relation("CreatedPortals")
+  // What this administrator removed. Kept after the records themselves are
+  // gone — see AdminDeletion, which is written outside the cascade precisely
+  // so a deletion cannot erase the evidence of itself.
+  adminDeletions   AdminDeletion[]        @relation("AdminDeletions")
   // Where this person works. One BASE posting and any number of COVER ones —
   // see TerritoryPosting. Replaces the single `territoryId` column, which
   // could not express an officer holding a vacant neighbouring patch.
@@ -1451,4 +1455,72 @@ model TerritoryPosting {
   @@unique([userId, territoryId])
   @@index([territoryId])
   @@index([kind])
+}
+
+// ---------------------------------------------------------------------------
+// The record of what an administrator removed
+// ---------------------------------------------------------------------------
+
+/// Which book a deleted record came out of.
+enum AdminRecordKind {
+  VEHICLE
+  CAPTURE_REQUEST
+  OFFROAD_CASE
+}
+
+/// A deletion, kept after the thing it deleted.
+///
+/// This exists because of a hole the rest of the product does not have. Every
+/// other change to a vehicle writes a VehicleEvent, and that trail is the
+/// product's central claim: you can always say who moved a file and when.
+/// Deleting the vehicle CASCADES those events away. The strongest act
+/// available to an administrator was therefore the only one that left no
+/// trace — and worse, it erased the trace of everything that came before it.
+///
+/// So the tombstone is written OUTSIDE the cascade, in a table with no foreign
+/// key back to the record. Nothing about the deletion can take it with them.
+///
+/// It stores a summary rather than the whole row. A full JSON dump would be an
+/// undelete that nobody has tested and everybody would assume works; this is
+/// deliberately a record of WHAT WAS LOST, not a copy of it. Enough to answer
+/// "where did CTG-11-3456 go", not enough to pretend the answer is reversible.
+model AdminDeletion {
+  id   String          @id @default(cuid())
+  kind AdminRecordKind
+
+  /// The id the record had. Not a relation — the row it pointed at is gone.
+  recordId String
+
+  /// How the record identified itself to the people who used it: a
+  /// registration number, almost always. The first thing anybody searches for
+  /// when they go looking for something that is no longer there.
+  label String @db.VarChar(120)
+
+  /// Customer name and code as they stood, because a registration number is
+  /// re-used across a fleet's lifetime and an account is not.
+  customer String? @db.VarChar(160)
+
+  /// The stage it was sitting in. A vehicle deleted at LIVE_FOR_RESALE is a
+  /// very different event from one deleted at CAPTURED, and after the fact
+  /// this column is the only thing that can tell them apart.
+  stage String? @db.VarChar(60)
+
+  /// What went with it. Photographs, audit events, bids — counted at the
+  /// moment of deletion, because afterwards there is nothing left to count.
+  /// This is what makes the cost of the act legible later.
+  cascaded String? @db.Text
+
+  /// Why. Required by the API, not by the column — a deletion with no stated
+  /// reason is the kind of record that starts an argument nobody can settle.
+  reason String @db.Text
+
+  /// Who. SetNull rather than Cascade: removing an administrator must not
+  /// quietly erase the record of what they deleted.
+  deletedById String?
+  deletedBy   User?    @relation("AdminDeletions", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletedAt   DateTime @default(now())
+
+  @@index([kind])
+  @@index([deletedAt])
+  @@index([recordId])
 }
