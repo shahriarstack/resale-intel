@@ -39,10 +39,27 @@ jobs:
           node-version: 20
           cache: npm
 
-      # `npm ci`, not `npm install`: there is a lockfile, and a release built
-      # from freshly resolved dependencies is not the release that was tested.
+      # `npm install`, not `npm ci`, and not by preference.
+      #
+      # `npm ci` is what this should be — there is a lockfile, and a release
+      # built from freshly resolved dependencies is not the release that was
+      # tested. It was tried and it fails the build:
+      #
+      #   npm error Missing: @emnapi/runtime@1.11.3 from lock file
+      #   npm error Missing: @emnapi/core@1.11.3 from lock file
+      #
+      # Those are optional dependencies of sharp's wasm variant. The lockfile
+      # is generated on Windows, where npm prunes packages constrained to
+      # other platforms and records no entry for them; on a Linux runner npm
+      # expects them and calls the lockfile out of sync. `--package-lock-only`
+      # does not fix it, with or without `--os=linux --cpu=x64`, because the
+      # pruning happens at resolution.
+      #
+      # To restore `npm ci`: regenerate package-lock.json ON LINUX — WSL, a
+      # container, or a throwaway CI job — and commit that. Until then this
+      # stays, because a reproducible build is worth less than a building one.
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       # The connection string is a SECRET. It used to sit in this file as
       # plaintext, on a repository that is pushed to GitHub. `npm run build`
