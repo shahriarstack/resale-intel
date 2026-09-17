@@ -783,7 +783,7 @@ export default function UsersAdminPage() {
                       with the roster. */}
                   <input
                     className="field mt-2"
-                    placeholder="Type a territory and press Enter to add it…"
+                    placeholder="Type a territory, press Enter…"
                     onKeyDown={(e) => {
                       if (e.key !== "Enter") return;
                       e.preventDefault();
@@ -802,6 +802,19 @@ export default function UsersAdminPage() {
                       e.currentTarget.value = "";
                     }}
                   />
+                  {/* Said before it is true, not after.
+                      The Part control only exists once a patch does, which
+                      made it invisible to anyone reading the empty form — they
+                      looked for a Part field, did not find one, and concluded
+                      it was missing. Naming the second step here costs one
+                      line and removes the whole confusion. */}
+                  {form.territoryNames.length === 0 && (
+                    <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
+                      Press <strong className="text-ink-2">Enter</strong> to add it — then
+                      choose its <strong className="text-ink-2">Part</strong> (A or B) below.
+                      A patch that does not exist yet is created when you save.
+                    </p>
+                  )}
 
                   {/* Part, per patch. Written onto the TERRITORY, so it reads
                       back the same for every officer posted there — and an
