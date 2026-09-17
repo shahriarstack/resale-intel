@@ -173,6 +173,35 @@ ceiling it deadlocks, leaving stuck processes that hold the limit until they
 are killed. Install nothing on the server — the release ships complete, and
 schema SQL is generated on a workstation with `prisma migrate diff`.
 
+### One method, never both
+
+**Manage the app through the cPanel Node.js interface, or through the terminal
+with a process manager. Never mix them.** This is the host's own rule, and it
+was learned the expensive way.
+
+cPanel's app manager only tracks processes it started itself. A Node process
+launched from the terminal — and `npm`, `npx` and `prisma` all launch Node —
+is invisible to it. **Stop and Restart in the panel will not close it.** It
+keeps running, holds its slots, and the next one accumulates on top, until the
+account hits NPROC and everything on it stops: sibling sites serve blank pages,
+cron dies, cPanel's own pages hang, and the terminal answers
+
+```
+cagefs_enter: Unable to fork
+```
+
+which is the trap closing — the tool you would use to clear it is the tool that
+can no longer start. Clearing it then needs the host, because only they can
+reach the processes from outside the cage.
+
+This is the second reason the release ships complete and schema SQL is built on
+a workstation. The first is that `npm install` forks hard; this one is worse,
+because its damage is silent and cumulative and survives every restart you
+think fixed it.
+
+If the app ever does need managing from a shell, take it out of the cPanel
+Node.js interface entirely and run it under PM2 — one owner, not two.
+
 ---
 
 ## Step 4 — The database
