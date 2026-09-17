@@ -2,4 +2,4 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/cvacimot/public_html/resale.cv-acimotors.com
-    - source /home/cvacimot/nodevenv/public_html/resale.cv-acimotors.com/24/bin/activate && cd /home/cvacimot/repositories/resale && npm install && npx prisma generate && npm run build && /bin/cp -a .next/standalone/. $DEPLOYPATH/ && /bin/cp -a .next/static $DEPLOYPATH/.next/static && /bin/cp -a public $DEPLOYPATH/public && mkdir -p $DEPLOYPATH/tmp && touch $DEPLOYPATH/tmp/restart.txt
+    - /home/cvacimot/nodevenv/public_html/resale.cv-acimotors.com/24/bin/npm install && /home/cvacimot/nodevenv/public_html/resale.cv-acimotors.com/24/bin/npx prisma generate && /home/cvacimot/nodevenv/public_html/resale.cv-acimotors.com/24/bin/npm run build && /bin/cp -a .next/standalone/. $DEPLOYPATH/ && /bin/cp -a .next/static $DEPLOYPATH/.next/static && /bin/cp -a public $DEPLOYPATH/public && mkdir -p $DEPLOYPATH/tmp && touch $DEPLOYPATH/tmp/restart.txt
