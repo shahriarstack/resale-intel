@@ -1,0 +1,8 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/cvacimot/public_html/resale.cv-acimotors.com
+    - /bin/cp -a * $DEPLOYPATH/
+    - /bin/cp -a .next $DEPLOYPATH/
+    - mkdir -p $DEPLOYPATH/tmp
+    - touch $DEPLOYPATH/tmp/restart.txt

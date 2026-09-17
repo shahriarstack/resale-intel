@@ -1,0 +1,14 @@
+{
+  "name": "Resale Intel — ACI Motors",
+  "short_name": "Resale Intel",
+  "description": "Commercial vehicle recovery and resale pipeline.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f4f4f9",
+  "theme_color": "#5546e0",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
