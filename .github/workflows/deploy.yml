@@ -38,27 +38,36 @@ jobs:
       - name: Prepare cPanel Files
         run: |
           mkdir -p .deploy
-          # Move standalone output to deploy folder and resolve all symlinks (-L) so FTP doesn't crash
-          cp -rL .next/standalone/* .deploy/
-          cp -rL .next/standalone/.env* .deploy/ 2>/dev/null || true
+          # Move standalone output to deploy folder
+          cp -r .next/standalone/* .deploy/
+          cp -r .next/standalone/.env* .deploy/ 2>/dev/null || true
           
           # Copy static files Next.js needs
           mkdir -p .deploy/.next
-          cp -rL .next/static .deploy/.next/static
-          cp -rL public .deploy/public
+          cp -r .next/static .deploy/.next/static
+          cp -r public .deploy/public
           
           # Create passenger restart file so cPanel reboots the app automatically
           mkdir -p .deploy/tmp
           touch .deploy/tmp/restart.txt
 
-      - name: Deploy to cPanel via FTP
+          # Zip everything into a single file to bypass cPanel FTP node_modules blocking
+          cd .deploy
+          zip -ry ../build.zip .
+
+      - name: Deploy Zip to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: 116.202.222.251
           username: ${{ secrets.CPANEL_USER }}
           password: ${{ secrets.CPANEL_PASS }}
-          local-dir: ./.deploy/
+          local-dir: ./
           server-dir: /public_html/resale.cv-acimotors.com/
           exclude: |
-            **/.git*
-            **/.git*/**
+            **/*
+            !build.zip
+
+      - name: Extract Zip on cPanel
+        run: |
+          curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
+          "https://116.202.222.251:2083/json-api/cpanel?cpanel_jsonapi_apiversion=2&cpanel_jsonapi_module=Fileman&cpanel_jsonapi_func=fileop&op=extract&sourcefiles=build.zip&destdir=/home/cvacimot/public_html/resale.cv-acimotors.com" -k
