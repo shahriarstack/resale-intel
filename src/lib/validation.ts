@@ -545,6 +545,18 @@ export const userCreateSchema = z.object({
    */
   territoryIds: z.array(z.string().trim().min(1)).max(20).default([]),
   baseTerritoryId: nullableId,
+  /**
+   * The same postings, named rather than picked.
+   *
+   * The territory list is not a thing anybody maintains separately — it is
+   * whatever the field force is posted to. An administrator adding an ARO
+   * types the patch that officer works, and if it is the first officer there,
+   * the patch comes into existence at that moment. When these are present
+   * they REPLACE the id fields above, which remain for the bulk import and for
+   * any caller that already holds ids.
+   */
+  territoryNames: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+  baseTerritoryName: z.string().trim().max(80).optional().or(z.literal("")),
   // The sales patch. Free text, and only meaningful on a sales officer — the
   // form hides it for every other role rather than storing a value nobody
   // will ever read.
@@ -618,6 +630,9 @@ export const userUpdateSchema = z.object({
   role: z.enum(ROLE_VALUES).optional(),
   territoryIds: z.array(z.string().trim().min(1)).max(20).optional(),
   baseTerritoryId: nullableId,
+  // Named postings, as on create. Present, they replace the ids above.
+  territoryNames: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+  baseTerritoryName: z.string().trim().max(80).optional().or(z.literal("")),
   salesTerritory: z.string().trim().max(80).optional().or(z.literal("")),
   isActive: z.boolean().optional(),
   portalId: nullableId,

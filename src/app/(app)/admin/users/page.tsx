@@ -65,8 +65,11 @@ const blank = {
   staffId: "",
   designation: "",
   role: "RECOVERY_TEAM" as Role,
-  territoryIds: [] as string[],
-  baseTerritoryId: "",
+  // Names, not ids. A territory comes into existence when an officer is
+  // posted to it, so the form cannot work in ids — a patch being named for
+  // the first time has none yet. The API resolves these to rows.
+  territoryNames: [] as string[],
+  baseTerritoryName: "",
   salesTerritory: "",
   portalId: "",
   isActive: true,
@@ -273,8 +276,9 @@ export default function UsersAdminPage() {
       staffId: u.staffId,
       designation: u.designation ?? "",
       role: u.role,
-      territoryIds: u.postings.map((p) => p.territoryId),
-      baseTerritoryId: u.postings.find((p) => p.kind === "BASE")?.territoryId ?? "",
+      territoryNames: u.postings.map((p) => p.territory.name),
+      baseTerritoryName:
+        u.postings.find((p) => p.kind === "BASE")?.territory.name ?? "",
       salesTerritory: u.salesTerritory ?? "",
       portalId: u.portalId ?? "",
       isActive: u.isActive,
@@ -291,7 +295,11 @@ export default function UsersAdminPage() {
     // Manager sees them under either part.
     // The same rule the API enforces, so the admin reads it before the round
     // trip rather than after it — and it is the API's own message.
-    const posting = postingError(form.role, form.territoryIds, form.baseTerritoryId || null);
+    const posting = postingError(
+      form.role,
+      form.territoryNames,
+      form.baseTerritoryName || null,
+    );
     if (posting) {
       setError(posting);
       return;
@@ -317,8 +325,8 @@ export default function UsersAdminPage() {
         staffId: form.staffId,
         designation: form.designation,
         role: form.role,
-        territoryIds: form.territoryIds,
-        baseTerritoryId: form.baseTerritoryId || null,
+        territoryNames: form.territoryNames,
+        baseTerritoryName: form.baseTerritoryName || null,
         // Only ever sent for a sales officer. Changing someone's role away
         // from sales clears it, so a stale patch name cannot linger on an
         // engineer and turn up in the offer book.
@@ -708,51 +716,89 @@ export default function UsersAdminPage() {
                     single territory there is nothing to choose and the base is
                     settled automatically. */}
                 <Labeled label={form.role === "RECOVERY_TEAM" ? "Territories *" : "Territories"}>
+                  {/* Existing patches, plus whatever this form has named that
+                      does not exist yet — both are chips, because to the person
+                      filling the form they are the same thing. */}
                   <div className="flex flex-wrap gap-1.5">
-                    {territories.map((t) => {
-                      const on = form.territoryIds.includes(t.id);
+                    {[
+                      ...new Set([
+                        ...territories.map((t) => t.name),
+                        ...form.territoryNames,
+                      ]),
+                    ].map((name) => {
+                      const on = form.territoryNames.includes(name);
+                      const isNew = !territories.some((t) => t.name === name);
                       return (
                         <button
-                          key={t.id}
+                          key={name}
                           type="button"
                           className="po-chip"
                           data-on={on || undefined}
+                          title={isNew ? "New — will be created when you save" : undefined}
                           onClick={() => {
                             const next = on
-                              ? form.territoryIds.filter((x) => x !== t.id)
-                              : [...form.territoryIds, t.id];
+                              ? form.territoryNames.filter((x) => x !== name)
+                              : [...form.territoryNames, name];
                             setForm({
                               ...form,
-                              territoryIds: next,
+                              territoryNames: next,
                               // The first one picked is their base, and
                               // dropping the base hands it to whatever is left
                               // — so the pair is never in an impossible state
                               // between two clicks.
-                              baseTerritoryId: next.includes(form.baseTerritoryId)
-                                ? form.baseTerritoryId
+                              baseTerritoryName: next.includes(form.baseTerritoryName)
+                                ? form.baseTerritoryName
                                 : (next[0] ?? ""),
                             });
                           }}
                         >
-                          {t.name}
+                          {name}
+                          {isNew ? " +" : ""}
                         </button>
                       );
                     })}
                   </div>
 
-                  {form.territoryIds.length > 1 && (
+                  {/* Naming a patch is how a patch is created. There is no
+                      other screen to visit first, and no list to keep in step
+                      with the roster. */}
+                  <input
+                    className="field mt-2"
+                    placeholder="Type a territory and press Enter to add it…"
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      const name = e.currentTarget.value.trim();
+                      if (!name) return;
+                      if (form.territoryNames.includes(name)) {
+                        e.currentTarget.value = "";
+                        return;
+                      }
+                      const next = [...form.territoryNames, name];
+                      setForm({
+                        ...form,
+                        territoryNames: next,
+                        baseTerritoryName: form.baseTerritoryName || next[0],
+                      });
+                      e.currentTarget.value = "";
+                    }}
+                  />
+
+                  {form.territoryNames.length > 1 && (
                     <div className="mt-2.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
                         Based in
                       </span>
                       <select
                         className="field mt-1"
-                        value={form.baseTerritoryId}
-                        onChange={(e) => setForm({ ...form, baseTerritoryId: e.target.value })}
+                        value={form.baseTerritoryName}
+                        onChange={(e) =>
+                          setForm({ ...form, baseTerritoryName: e.target.value })
+                        }
                       >
-                        {form.territoryIds.map((id) => (
-                          <option key={id} value={id}>
-                            {territories.find((t) => t.id === id)?.name ?? id}
+                        {form.territoryNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
                           </option>
                         ))}
                       </select>
@@ -764,7 +810,7 @@ export default function UsersAdminPage() {
                     </div>
                   )}
 
-                  {form.role === "RECOVERY_TEAM" && form.territoryIds.length <= 1 && (
+                  {form.role === "RECOVERY_TEAM" && form.territoryNames.length <= 1 && (
                     <p className="mt-1.5 text-[11px] leading-snug text-ink-3">
                       At least one. This is what puts their captures on the coverage table — pick a
                       second if they are covering a patch nobody is posted to.

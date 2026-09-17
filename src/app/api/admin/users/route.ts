@@ -3,6 +3,7 @@ import { ok, fail, withGuard } from "@/lib/api";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { portalPairingError } from "@/lib/portals";
+import { resolveTerritoryNames } from "@/lib/masterData";
 import { postingError } from "@/lib/postings";
 import { userCreateSchema } from "@/lib/validation";
 
@@ -46,7 +47,23 @@ export const POST = withGuard(async (request: Request) => {
   const mismatch = portalPairingError(data.role, data.portalId);
   if (mismatch) return fail(mismatch, 422);
 
-  const posting = postingError(data.role, data.territoryIds, data.baseTerritoryId);
+  // Typed patches become rows here, before anything is validated against
+  // them. The territory list is whatever the field force is posted to — see
+  // resolveTerritoryNames — so an administrator naming a patch no officer has
+  // worked before brings it into existence by doing so.
+  let territoryIds = data.territoryIds;
+  let baseTerritoryId = data.baseTerritoryId;
+  if (data.territoryNames) {
+    const resolved = await resolveTerritoryNames(data.territoryNames);
+    if ("error" in resolved) return fail(resolved.error, 422);
+    territoryIds = resolved.ids;
+    const baseName = data.baseTerritoryName?.trim();
+    baseTerritoryId = baseName
+      ? (resolved.idByName.get(baseName.toLowerCase()) ?? null)
+      : null;
+  }
+
+  const posting = postingError(data.role, territoryIds, baseTerritoryId);
   if (posting) return fail(posting, 422);
 
   // The Staff ID is the credential — see lib/credential.ts. Derived from the
@@ -67,9 +84,9 @@ export const POST = withGuard(async (request: Request) => {
       // The postings go in with the account, in one write. The base is the
       // patch they belong to; everything else they hold is cover.
       postings: {
-        create: data.territoryIds.map((territoryId) => ({
+        create: territoryIds.map((territoryId) => ({
           territoryId,
-          kind: territoryId === data.baseTerritoryId ? ("BASE" as const) : ("COVER" as const),
+          kind: territoryId === baseTerritoryId ? ("BASE" as const) : ("COVER" as const),
         })),
       },
     },
