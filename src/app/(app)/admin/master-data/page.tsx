@@ -12,28 +12,40 @@ import {
   Check,
   X,
   EyeOff,
+  Truck,
+  CornerDownRight,
+  AlertTriangle,
 } from "lucide-react";
 import { getJSON, sendJSON } from "@/lib/http";
 import { Chip } from "@/components/ui/Chip";
 import { useToast } from "@/components/ui/Toast";
 
-interface Territory { id: string; name: string; code: string | null; isActive: boolean }
+interface Territory {
+  id: string;
+  name: string;
+  code: string | null;
+  part: "A" | "B" | null;
+  isActive: boolean;
+}
 interface Location { id: string; name: string; type: string; isActive: boolean }
 interface Question { id: string; key: string; label: string; requiresNote: boolean; sortOrder: number; isActive: boolean }
+interface VehicleModel { id: string; name: string; isActive: boolean; sortOrder: number }
+interface Brand { id: string; name: string; isActive: boolean; sortOrder: number; models: VehicleModel[] }
 
 export default function MasterDataPage() {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-7 lg:px-8">
+    <div className="mx-auto w-full max-w-5xl px-6 py-7 lg:px-8">
       <header className="mb-6" style={{ animation: "fadeIn 0.24s var(--ease-standard)" }}>
         <div className="eyebrow text-accent">Administration</div>
         <h1 className="page-title mt-1 text-[28px]">Master data</h1>
         <p className="mt-1 text-[14px] text-ink-2">
-          Territories, locations and the capture checklist. Hidden items stay on existing records but
-          disappear from the capture form.
+          Vehicle brands, territories, locations and the capture checklist. Hidden items stay on
+          existing records but disappear from the capture form.
         </p>
       </header>
 
       <div className="space-y-4">
+        <BrandSection />
         <TerritorySection />
         <LocationSection />
         <QuestionSection />
@@ -143,7 +155,7 @@ function Row({
   onRename,
   onToggle,
   onDelete,
-  index,
+  extra,
 }: {
   main: string;
   sub?: React.ReactNode;
@@ -152,7 +164,8 @@ function Row({
   onRename: (value: string) => Promise<void>;
   onToggle: () => void;
   onDelete: () => void;
-  index: number;
+  /** Optional control shown before the status chip — e.g. a territory's part. */
+  extra?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(main);
@@ -236,6 +249,7 @@ function Row({
 
       {!editing && (
         <div className="flex shrink-0 items-center gap-2">
+          {extra}
           {active ? <Chip tone="ok">Active</Chip> : <Chip tone="neutral">Hidden</Chip>}
           <button className="btn btn-ghost btn-sm" onClick={onToggle}>
             {active ? "Hide" : "Show"}
@@ -260,10 +274,12 @@ function TerritorySection() {
   const { items, loading, load } = useList<Territory>("/api/admin/territories");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [part, setPart] = useState("");
   const [busy, setBusy] = useState(false);
   const [showHidden, setShowHidden] = useState(true);
 
   const hidden = items.filter((t) => !t.isActive).length;
+  const unparted = items.filter((t) => t.isActive && !t.part).length;
   const visible = useMemo(
     () => (showHidden ? items : items.filter((t) => t.isActive)),
     [items, showHidden],
@@ -273,8 +289,8 @@ function TerritorySection() {
     if (!name.trim()) return;
     setBusy(true);
     try {
-      await sendJSON("/api/admin/territories", "POST", { name, code });
-      setName(""); setCode("");
+      await sendJSON("/api/admin/territories", "POST", { name, code, part: part || null });
+      setName(""); setCode(""); setPart("");
       toast(`Territory "${name}" added`);
       await load();
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "bad"); }
@@ -286,6 +302,13 @@ function TerritorySection() {
       toast(`Renamed to "${value}"`);
       await load();
     } catch (e) { toast(e instanceof Error ? e.message : "Rename failed", "bad"); }
+  };
+  const setTerritoryPart = async (t: Territory, value: string) => {
+    try {
+      await sendJSON(`/api/admin/territories/${t.id}`, "PATCH", { part: value || null });
+      toast(value ? `${t.name} moved to Part ${value}` : `${t.name} cleared`);
+      await load();
+    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "bad"); }
   };
   const toggle = async (t: Territory) => {
     await sendJSON(`/api/admin/territories/${t.id}`, "PATCH", { isActive: !t.isActive });
@@ -306,7 +329,7 @@ function TerritorySection() {
     <Card
       icon={<MapPin size={17} />}
       title="Territories"
-      subtitle="Sales territories offered on the capture form and user profiles."
+      subtitle="Sales territories, each owned by one half of the recovery organisation."
       count={items.length}
       hidden={hidden}
       showHidden={showHidden}
@@ -315,23 +338,47 @@ function TerritorySection() {
     >
       <div className="mb-4 flex gap-2">
         <input className="field" placeholder="Territory name" aria-label="New territory name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
-        <input className="field w-32" placeholder="Code" aria-label="Territory code (optional)" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+        <input className="field w-28" placeholder="Code" aria-label="Territory code (optional)" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+        <select className="field w-32" aria-label="Recovery part" value={part} onChange={(e) => setPart(e.target.value)}>
+          <option value="">No part</option>
+          <option value="A">Part A</option>
+          <option value="B">Part B</option>
+        </select>
         <button className="btn btn-primary shrink-0" onClick={add} disabled={busy || !name.trim()}>
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
         </button>
       </div>
+      {unparted > 0 && (
+        <p className="mb-3 flex items-center gap-1.5 text-[11.5px] text-warn">
+          <AlertTriangle size={12} className="shrink-0" />
+          {unparted} active {unparted === 1 ? "territory is" : "territories are"} not assigned to a
+          recovery part — they fall outside both Part A and Part B filters.
+        </p>
+      )}
       {loading ? <SkeletonBlock /> : visible.length === 0 ? <Empty hidden={hidden > 0 && !showHidden} /> : (
         <Rows>
-          {visible.map((t, i) => (
+          {visible.map((t) => (
             <Row
               key={t.id}
-              index={i}
               main={t.name}
               sub={t.code || undefined}
               active={t.isActive}
               onRename={(v) => rename(t, v)}
               onToggle={() => toggle(t)}
               onDelete={() => del(t)}
+              extra={
+                <select
+                  className="field h-8 w-[86px] px-2 py-0 text-xs"
+                  aria-label={`Recovery part for ${t.name}`}
+                  value={t.part ?? ""}
+                  onChange={(e) => setTerritoryPart(t, e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <option value="">—</option>
+                  <option value="A">Part A</option>
+                  <option value="B">Part B</option>
+                </select>
+              }
             />
           ))}
         </Rows>
@@ -404,6 +451,7 @@ function LocationSection() {
           <option value="YARD">Yard</option>
           <option value="DEPOT">Depot</option>
           <option value="SHOWROOM">Showroom</option>
+          <option value="CUSTOMER">With customer</option>
           <option value="OTHER">Other</option>
         </select>
         <button className="btn btn-primary shrink-0" onClick={add} disabled={busy || !name.trim()}>
@@ -412,10 +460,9 @@ function LocationSection() {
       </div>
       {loading ? <SkeletonBlock /> : visible.length === 0 ? <Empty hidden={hidden > 0 && !showHidden} /> : (
         <Rows>
-          {visible.map((l, i) => (
+          {visible.map((l) => (
             <Row
               key={l.id}
-              index={i}
               main={l.name}
               sub={l.type}
               active={l.isActive}
@@ -427,6 +474,270 @@ function LocationSection() {
         </Rows>
       )}
     </Card>
+  );
+}
+
+/**
+ * Brands, and the models under each.
+ *
+ * Nested rather than two flat lists: a model only means anything inside its
+ * brand, and an admin adding "Aumark S" is always thinking "…to Foton". Two
+ * sibling tables would make them pick the brand twice, once to find the model
+ * and once to file it.
+ */
+function BrandSection() {
+  const { toast } = useToast();
+  const { items, loading, load } = useList<Brand>("/api/admin/brands");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showHidden, setShowHidden] = useState(true);
+
+  const hidden = items.filter((b) => !b.isActive).length;
+  const visible = useMemo(
+    () => (showHidden ? items : items.filter((b) => b.isActive)),
+    [items, showHidden],
+  );
+  const modelCount = items.reduce((n, b) => n + b.models.length, 0);
+
+  const fail = (e: unknown, fallback: string) =>
+    toast(e instanceof Error ? e.message : fallback, "bad");
+
+  const addBrand = async () => {
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      await sendJSON("/api/admin/brands", "POST", { name });
+      setName("");
+      toast(`Brand "${name}" added`);
+      await load();
+    } catch (e) { fail(e, "Failed"); }
+    finally { setBusy(false); }
+  };
+
+  const renameBrand = async (b: Brand, value: string) => {
+    try {
+      await sendJSON(`/api/admin/brands/${b.id}`, "PATCH", { name: value });
+      toast(`Renamed to "${value}"`);
+      await load();
+    } catch (e) { fail(e, "Rename failed"); }
+  };
+
+  const toggleBrand = async (b: Brand) => {
+    try {
+      await sendJSON(`/api/admin/brands/${b.id}`, "PATCH", { isActive: !b.isActive });
+      toast(`${b.name} ${b.isActive ? "hidden" : "shown"}`);
+      await load();
+    } catch (e) { fail(e, "Failed"); }
+  };
+
+  const delBrand = async (b: Brand) => {
+    const warning = b.models.length
+      ? `Delete brand "${b.name}" and its ${b.models.length} model${b.models.length === 1 ? "" : "s"}?\n\nVehicles already captured keep the brand recorded on them.`
+      : `Delete brand "${b.name}"?`;
+    if (!confirm(warning)) return;
+    try {
+      await sendJSON(`/api/admin/brands/${b.id}`, "DELETE");
+      toast(`Brand "${b.name}" deleted`);
+      await load();
+    } catch (e) { fail(e, "Failed"); }
+  };
+
+  const addModel = async (brandId: string, modelName: string) => {
+    await sendJSON("/api/admin/models", "POST", { brandId, name: modelName });
+    await load();
+  };
+
+  const renameModel = async (m: VehicleModel, value: string) => {
+    try {
+      await sendJSON(`/api/admin/models/${m.id}`, "PATCH", { name: value });
+      toast(`Renamed to "${value}"`);
+      await load();
+    } catch (e) { fail(e, "Rename failed"); }
+  };
+
+  const toggleModel = async (m: VehicleModel) => {
+    try {
+      await sendJSON(`/api/admin/models/${m.id}`, "PATCH", { isActive: !m.isActive });
+      await load();
+    } catch (e) { fail(e, "Failed"); }
+  };
+
+  const delModel = async (m: VehicleModel) => {
+    if (!confirm(`Delete model "${m.name}"?`)) return;
+    try {
+      await sendJSON(`/api/admin/models/${m.id}`, "DELETE");
+      toast(`Model "${m.name}" deleted`);
+      await load();
+    } catch (e) { fail(e, "Failed"); }
+  };
+
+  return (
+    <Card
+      icon={<Truck size={17} />}
+      title="Brands & models"
+      subtitle="The vehicle brand and model dropdowns on the capture form."
+      count={items.length}
+      hidden={hidden}
+      showHidden={showHidden}
+      onToggleHidden={() => setShowHidden(!showHidden)}
+      delay={0.02}
+    >
+      <div className="mb-4 flex gap-2">
+        <input
+          className="field"
+          placeholder="Brand name"
+          aria-label="New brand name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addBrand()}
+        />
+        <button className="btn btn-primary shrink-0" onClick={addBrand} disabled={busy || !name.trim()}>
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+        </button>
+      </div>
+
+      {modelCount > 0 && (
+        <p className="mb-3 font-mono text-[11px] text-ink-3">
+          {modelCount} model{modelCount === 1 ? "" : "s"} across {items.length} brand
+          {items.length === 1 ? "" : "s"}
+        </p>
+      )}
+
+      {loading ? <SkeletonBlock /> : visible.length === 0 ? <Empty hidden={hidden > 0 && !showHidden} /> : (
+        <div className="space-y-2">
+          {visible.map((b, i) => (
+            <BrandRow
+              key={b.id}
+              brand={b}
+              index={i}
+              onRename={(v) => renameBrand(b, v)}
+              onToggle={() => toggleBrand(b)}
+              onDelete={() => delBrand(b)}
+              onAddModel={(n) => addModel(b.id, n)}
+              onRenameModel={renameModel}
+              onToggleModel={toggleModel}
+              onDeleteModel={delModel}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function BrandRow({
+  brand,
+  index,
+  onRename,
+  onToggle,
+  onDelete,
+  onAddModel,
+  onRenameModel,
+  onToggleModel,
+  onDeleteModel,
+}: {
+  brand: Brand;
+  index: number;
+  onRename: (v: string) => Promise<void>;
+  onToggle: () => void;
+  onDelete: () => void;
+  onAddModel: (name: string) => Promise<void>;
+  onRenameModel: (m: VehicleModel, v: string) => Promise<void>;
+  onToggleModel: (m: VehicleModel) => void;
+  onDeleteModel: (m: VehicleModel) => void;
+}) {
+  const { toast } = useToast();
+  // Brands open by default when they have no models — an empty brand is the
+  // one that needs attention, so hiding its input behind a click is backwards.
+  const [open, setOpen] = useState(brand.models.length === 0);
+  const [draft, setDraft] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const submitModel = async () => {
+    const value = draft.trim();
+    if (!value) return;
+    setAdding(true);
+    try {
+      await onAddModel(value);
+      setDraft("");
+      toast(`Model "${value}" added to ${brand.name}`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Failed", "bad");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div
+      className="overflow-hidden rounded-lg border border-rule"
+      style={{
+        opacity: brand.isActive ? 1 : 0.6,
+        animation: `fadeIn 0.2s var(--ease-standard) ${Math.min(index, 8) * 0.02}s both`,
+      }}
+    >
+      <div className="bg-surface-2">
+        <Row
+          main={brand.name}
+          sub={`${brand.models.length} model${brand.models.length === 1 ? "" : "s"}`}
+          active={brand.isActive}
+          onRename={onRename}
+          onToggle={onToggle}
+          onDelete={onDelete}
+        />
+      </div>
+
+      <button
+        type="button"
+        className="flex w-full items-center gap-1.5 border-t border-rule px-4 py-1.5 text-left font-mono text-[10.5px] uppercase tracking-wider text-ink-3 transition-colors hover:bg-surface-2 hover:text-accent"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <CornerDownRight size={11} />
+        {open ? "Hide models" : `Models · ${brand.models.length}`}
+      </button>
+
+      {open && (
+        <div className="border-t border-rule px-3 py-2.5" style={{ animation: "slideDown 0.15s var(--ease-standard)" }}>
+          <div className="mb-2 flex gap-2">
+            <input
+              className="field text-sm"
+              placeholder={`New model for ${brand.name}`}
+              aria-label={`New model name for ${brand.name}`}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitModel()}
+            />
+            <button
+              className="btn btn-ghost btn-sm shrink-0"
+              onClick={submitModel}
+              disabled={adding || !draft.trim()}
+            >
+              {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            </button>
+          </div>
+
+          {brand.models.length === 0 ? (
+            <p className="px-1 py-2 text-xs text-ink-3">
+              No models yet. The capture form will offer this brand with an empty model list.
+            </p>
+          ) : (
+            <Rows>
+              {brand.models.map((m) => (
+                <Row
+                  key={m.id}
+                  main={m.name}
+                  active={m.isActive}
+                  onRename={(v) => onRenameModel(m, v)}
+                  onToggle={() => onToggleModel(m)}
+                  onDelete={() => onDeleteModel(m)}
+                />
+              ))}
+            </Rows>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -511,10 +822,9 @@ function QuestionSection() {
       </div>
       {loading ? <SkeletonBlock /> : visible.length === 0 ? <Empty hidden={hidden > 0 && !showHidden} /> : (
         <Rows>
-          {visible.map((q, i) => (
+          {visible.map((q) => (
             <Row
               key={q.id}
-              index={i}
               main={q.label}
               sub={
                 <button
@@ -551,7 +861,7 @@ function SkeletonBlock() {
 function Empty({ hidden }: { hidden?: boolean }) {
   return (
     <p className="py-8 text-center text-sm text-ink-3">
-      {hidden ? "Everything here is hidden — switch the filter to see it." : "Nothing yet — add the first one above."}
+      {hidden ? "Everything here is hidden. Switch the filter to see it." : "Nothing yet. Add the first one above."}
     </p>
   );
 }

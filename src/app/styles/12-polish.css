@@ -1,0 +1,290 @@
+/* ===========================================================================
+   TINTED SURFACES — the finishing pass
+   ===========================================================================
+   A flat fill is the tell of a template. Anything that carries a semantic tint
+   across a meaningful area now gets three things a hand-built panel has and a
+   generated one does not: a two-percent vertical fall so the surface has a top
+   and a bottom, a hairline drawn IN its own hue rather than the neutral grey,
+   and its text in the ink step so the type actually holds on the tint.
+
+   Deliberately NOT applied to chips and badges. At 20px tall a gradient is
+   invisible and the extra border weight makes a row of them look loud — small
+   things stay flat, large things get the material. That distinction is the
+   whole point; applying the treatment everywhere is how it stops reading as
+   considered.
+   ======================================================================== */
+@layer components {
+  .tint-ok,
+  .tint-warn,
+  .tint-bad,
+  .tint-accent {
+    border: 1px solid;
+    border-radius: var(--radius);
+  }
+  .tint-ok {
+    background-image: var(--grad-tint-ok);
+    border-color: var(--ok-line);
+    color: var(--ok-ink);
+  }
+  .tint-warn {
+    background-image: var(--grad-tint-warn);
+    border-color: var(--warn-line);
+    color: var(--warn-ink);
+  }
+  .tint-bad {
+    background-image: var(--grad-tint-bad);
+    border-color: var(--bad-line);
+    color: var(--bad-ink);
+  }
+  .tint-accent {
+    background-image: var(--grad-tint-accent);
+    border-color: var(--accent-line);
+    color: var(--accent-ink-on-soft);
+  }
+
+  /* The banner form of the same idea — an alert strip that spans a panel.
+     The hue's own hairline on all four sides, never a heavy bar down one. */
+  .alert-strip {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid;
+    border-radius: var(--radius);
+    font-size: var(--t-sm);
+    line-height: 1.55;
+  }
+}
+
+/* ===========================================================================
+   ARO DASHBOARD — header, and the polish across the panel
+   ===========================================================================
+   This is the one screen an officer opens on a phone in a yard, often in
+   sunlight and often one-handed. Everything below is in service of that:
+   weight where the eye lands first, restraint everywhere else, and no
+   decoration that costs legibility.
+   ======================================================================== */
+@layer components {
+  /* ---- Greeting left, date right ---- */
+  .aro-greet {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    animation: aroRise 0.42s var(--ease-out-quart) both;
+  }
+  .aro-greet-eyebrow {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--ink-3);
+  }
+  /* The name is the biggest thing on the screen. It is also the only word
+     here that is personal, and a panel that greets someone by name in the
+     same weight as the date does not actually greet them. */
+  .aro-greet-name {
+    margin-top: 1px;
+    font-family: var(--font-display);
+    font-size: 25px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---- The date, as a tile ---- */
+  .aro-datetile {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 54px;
+    padding: 6px 0 7px;
+    border-radius: var(--radius);
+    border: 1px solid var(--accent-line);
+    /* Two stops, two percent apart. Meant to be felt rather than seen — it is
+       what makes the tile read as a material with a top and a bottom instead
+       of a flat swatch. */
+    background: linear-gradient(180deg, var(--accent-soft), var(--accent-soft-2));
+    box-shadow: var(--shadow-sm);
+    line-height: 1;
+  }
+  .aro-datetile-dow {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-indent: 0.14em;
+    color: var(--accent-ink-on-soft);
+    opacity: 0.72;
+  }
+  .aro-datetile-day {
+    margin: 2px 0 1px;
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-ink);
+  }
+  .aro-datetile-mon {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-indent: 0.14em;
+    color: var(--accent-ink-on-soft);
+    opacity: 0.72;
+  }
+
+  /* ---- Section headings ----
+     A hairline that starts at the text and runs to the edge. It costs one
+     pixel and it does the job a bigger type size was doing before: it says
+     "a new group starts here" without shouting. */
+  .aro-h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0 8px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .aro-h2::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--rule), transparent);
+  }
+
+  /* ---- Attention rows ----
+     The tone already arrives as --tone from the row. A 2px inset on the left
+     edge, drawn INSIDE the row rather than as a border, keeps every row the
+     same width while still colour-coding it — a real border would shift the
+     content of toned rows against untoned ones. */
+  .aro-row {
+    position: relative;
+    transition:
+      background-color 0.14s var(--ease-standard),
+      transform 0.14s var(--ease-standard);
+  }
+  .aro-row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: var(--tone, transparent);
+    opacity: 0;
+    transition: opacity 0.14s var(--ease-standard);
+  }
+  .aro-row:hover::before,
+  .aro-row:focus-visible::before {
+    opacity: 0.9;
+  }
+  .aro-row:hover {
+    background: var(--surface-2);
+  }
+
+  /* ---- Start tiles ---- */
+  .aro-start {
+    transition:
+      transform 0.14s var(--ease-standard),
+      box-shadow 0.14s var(--ease-standard),
+      border-color 0.14s var(--ease-standard);
+  }
+  .aro-start:hover {
+    transform: translateY(-1px);
+    border-color: var(--rule-strong);
+    box-shadow: var(--shadow-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aro-greet,
+    .aro-row,
+    .aro-start {
+      animation: none;
+      transition: none;
+    }
+    .aro-start:hover {
+      transform: none;
+    }
+  }
+}
+
+
+/* ===========================================================================
+   THE ACCOUNT HEADING
+
+   Every operations record is headed by the customer it belongs to — see the
+   note at the top of lib/vehicle.ts for why, and components/ui/AccountTitle
+   for the markup. Two halves on one line with opposite truncation rules:
+
+     code  fixed-width, never cut. "CUS-41…" identifies nothing, which is the
+           same reason the registration is shrink-0 on these cards.
+     name  absorbs whatever is left. "Meghna Logis…" is still unmistakably
+           the right customer.
+
+   The code is set BELOW the name's size rather than beside it at parity: it is
+   how the system finds the account and the name is how a person does, and the
+   heading should read as a name with its reference attached rather than as two
+   competing identifiers.
+   ======================================================================== */
+
+@layer components {
+  .acct-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+  }
+  .acct-code {
+    flex: none;
+    font-family: var(--font-mono);
+    /* Relative, so one rule serves the 16px card heading and the 13px desk
+       row without either naming a size of its own. */
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+  }
+  .acct-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ===========================================================================
+   BACK
+   A control, not a breadcrumb link. See components/ui/BackLink for why it is a
+   button: it goes where you came FROM, and only falls through to a named
+   parent when there is nowhere behind it.
+   ======================================================================== */
+
+@layer components {
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: -4px;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition:
+      color 0.16s var(--ease-standard),
+      background-color 0.16s var(--ease-standard);
+  }
+  .back-link:hover {
+    color: var(--accent);
+    background: var(--surface-2);
+  }
+}

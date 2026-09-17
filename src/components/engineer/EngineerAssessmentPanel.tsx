@@ -1,52 +1,91 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Camera, Loader2, X, Check, AlertCircle } from "lucide-react";
-import { sendJSON, uploadImage } from "@/lib/http";
+import {
+  AlertCircle,
+  Check,
+  FileText,
+  FileUp,
+  Loader2,
+  Save,
+  Send,
+  Trash2,
+  Wrench,
+  X,
+} from "lucide-react";
+import { sendJSON, uploadDocument } from "@/lib/http";
 import { compressImage } from "@/lib/image";
+import { isPdfUrl } from "@/lib/photos";
 import { taka } from "@/lib/format";
+import { NumberField } from "@/components/ui/NumberField";
+import { HandoffDialog } from "@/components/ui/HandoffDialog";
 
-interface RepairLine {
-  key: string;
-  description: string;
-  amount: string;
-}
+/**
+ * The Service Engineer's cost analysis.
+ *
+ * This used to ask for the estimate line by line: a description and an amount
+ * per repair item, typed on a phone next to a half-stripped vehicle. It was
+ * transcription. The workshop already produces a written estimate, the engineer
+ * was holding it, and the app was asking them to make a worse copy of it —
+ * slower to enter, and no more authoritative than the sheet it came from.
+ *
+ * So the sheet IS the submission. Two things are asked for now:
+ *
+ *   THE NUMBER   one figure, the total the Service Manager is being asked to
+ *     authorise. It is the only thing typed, so it gets a field sized like it
+ *     matters.
+ *
+ *   THE SHEET    the estimate itself, photographed or as a PDF. Whichever the
+ *     workshop produced; refusing one format only means it gets photographed
+ *     off a screen.
+ *
+ * Everything else follows from being used one-handed in a workshop: a numeric
+ * keypad on the money fields, 44px minimum targets, and a submit bar pinned to
+ * the bottom so it is never scrolled off.
+ */
+
 interface ExistingSheet {
   id: string;
   url: string;
 }
+
 interface NewSheet {
   key: string;
   status: "busy" | "done" | "error";
-  preview: string;
+  /** Object URL for an image; null for a PDF, which has no inline preview. */
+  preview: string | null;
+  fileName: string;
+  isPdf: boolean;
   name?: string;
 }
 
 let counter = 0;
-const uid = () => `r${counter++}`;
+const uid = () => `s${counter++}`;
 
 export function EngineerAssessmentPanel({
   vehicleId,
-  initialLines,
+  subject,
+  initialRepairCost,
+  initialNote,
   initialTransport,
   initialOther,
   existingSheets,
 }: {
   vehicleId: string;
-  initialLines: { description: string; amount: number }[];
+  /** Names the vehicle on the hand-off receipt. */
+  subject: string;
+  initialRepairCost: number;
+  initialNote: string;
   initialTransport: number;
   initialOther: number;
   existingSheets: ExistingSheet[];
 }) {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const sheetRef = useRef<HTMLInputElement>(null);
 
-  const [lines, setLines] = useState<RepairLine[]>(
-    initialLines.length
-      ? initialLines.map((l) => ({ key: uid(), description: l.description, amount: String(l.amount) }))
-      : [{ key: uid(), description: "", amount: "" }],
-  );
+  const [repairCost, setRepairCost] = useState(String(initialRepairCost || ""));
+  const [note, setNote] = useState(initialNote);
   const [transport, setTransport] = useState(String(initialTransport || ""));
   const [other, setOther] = useState(String(initialOther || ""));
   const [sheets, setSheets] = useState<ExistingSheet[]>(existingSheets);
@@ -54,60 +93,80 @@ export function EngineerAssessmentPanel({
   const [newSheets, setNewSheets] = useState<NewSheet[]>([]);
   const [busy, setBusy] = useState<null | "draft" | "submit">(null);
   const [error, setError] = useState("");
+  const [handedOff, setHandedOff] = useState(false);
 
-  const repairTotal = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
-  const grandTotal = repairTotal + (parseFloat(transport) || 0) + (parseFloat(other) || 0);
+  // Object URLs are a manual resource. Without this the previews leak for the
+  // life of the page, which on a phone session is real.
+  useEffect(() => {
+    return () => {
+      for (const s of newSheets) if (s.preview) URL.revokeObjectURL(s.preview);
+    };
+    // Cleanup only on unmount: the list is read from the closure at teardown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const setLine = (key: string, patch: Partial<RepairLine>) =>
-    setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const addLine = () => setLines((ls) => [...ls, { key: uid(), description: "", amount: "" }]);
-  const removeLine = (key: string) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
+  const repair = parseFloat(repairCost) || 0;
+  const grandTotal = repair + (parseFloat(transport) || 0) + (parseFloat(other) || 0);
+  const sheetCount = sheets.length + newSheets.filter((s) => s.status === "done").length;
+  const uploading = newSheets.some((s) => s.status === "busy");
+  const ready = repair > 0 && sheetCount > 0 && !uploading;
+
+  const addSheets = async (files: FileList) => {
+    for (const file of Array.from(files)) {
+      const key = uid();
+      const isPdf = file.type === "application/pdf";
+      // A PDF is uploaded whole; a photograph of a written sheet gets the same
+      // downscale every other camera upload gets.
+      const preview = isPdf ? null : URL.createObjectURL(file);
+      setNewSheets((n) => [
+        ...n,
+        { key, status: "busy", preview, fileName: file.name, isPdf },
+      ]);
+      try {
+        const payload = isPdf ? file : await compressImage(file);
+        const { name } = await uploadDocument(payload);
+        setNewSheets((n) => n.map((s) => (s.key === key ? { ...s, status: "done", name } : s)));
+      } catch (e) {
+        setNewSheets((n) => n.map((s) => (s.key === key ? { ...s, status: "error" } : s)));
+        setError(e instanceof Error ? e.message : "Upload failed");
+      }
+    }
+  };
+
+  const dropNew = (key: string) =>
+    setNewSheets((n) => {
+      const gone = n.find((s) => s.key === key);
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
+      return n.filter((s) => s.key !== key);
+    });
 
   const removeExisting = (id: string) => {
     setSheets((s) => s.filter((x) => x.id !== id));
     setRemoved((r) => [...r, id]);
   };
 
-  const addSheets = async (files: FileList) => {
-    for (const file of Array.from(files)) {
-      const key = uid();
-      const preview = URL.createObjectURL(file);
-      setNewSheets((n) => [...n, { key, status: "busy", preview }]);
-      try {
-        const compressed = await compressImage(file);
-        const { name } = await uploadImage(compressed);
-        setNewSheets((n) => n.map((s) => (s.key === key ? { ...s, status: "done", name } : s)));
-      } catch {
-        setNewSheets((n) => n.map((s) => (s.key === key ? { ...s, status: "error" } : s)));
-      }
-    }
-  };
-
   const save = async (submit: boolean) => {
     setError("");
-    const cleanLines = lines
-      .filter((l) => l.description.trim() || l.amount)
-      .map((l) => ({ description: l.description.trim(), amount: parseFloat(l.amount) || 0 }));
-
     if (submit) {
-      if (cleanLines.length === 0 || cleanLines.some((l) => !l.description)) {
-        setError("Add at least one complete repair line (description + amount).");
+      if (repair <= 0) {
+        setError("Enter the repair cost before submitting.");
         return;
       }
-      if (sheets.length + newSheets.filter((s) => s.status === "done").length === 0) {
-        setError("Upload at least one assessment sheet.");
+      if (sheetCount === 0) {
+        setError("Upload the repair estimate sheet before submitting.");
         return;
       }
     }
-    if (newSheets.some((s) => s.status === "busy")) {
-      setError("Wait for sheet uploads to finish.");
+    if (uploading) {
+      setError("Wait for the upload to finish.");
       return;
     }
 
     setBusy(submit ? "submit" : "draft");
     try {
       await sendJSON(`/api/vehicles/${vehicleId}/assessment`, "POST", {
-        repairLines: cleanLines,
+        repairCost: repair,
+        repairNote: note.trim(),
         transportCost: parseFloat(transport) || 0,
         otherCost: parseFloat(other) || 0,
         newSheetNames: newSheets.filter((s) => s.status === "done").map((s) => s.name),
@@ -115,7 +174,9 @@ export function EngineerAssessmentPanel({
         submit,
       });
       if (submit) {
-        router.push("/dashboard");
+        // The panel stays behind the receipt; leaving happens when it is
+        // dismissed, not underneath it.
+        setHandedOff(true);
       } else {
         setNewSheets([]);
         setRemoved([]);
@@ -128,166 +189,285 @@ export function EngineerAssessmentPanel({
     }
   };
 
+  const handoff = (
+    <HandoffDialog
+      open={handedOff}
+      title="Estimate submitted"
+      subject={subject}
+      facts={[
+        { label: "Repair", value: taka(repair), strong: true },
+        { label: "Transport", value: taka(parseFloat(transport) || 0) },
+        { label: "Other", value: taka(parseFloat(other) || 0) },
+        { label: "Estimate sheets", value: String(sheetCount) },
+      ]}
+      nextDesk="Service Manager"
+      nextAction="Reviews the estimate and authorises the repair budget."
+      thanks="Thank you — the sheet you attached is what the whole approval rests on."
+      onContinue={() => router.push("/dashboard")}
+    />
+  );
+
   return (
-    <section className="action-panel p-5">
-      <h2 className="mb-1 font-display text-[15px] font-bold text-ink">Cost analysis</h2>
-      <p className="mb-4 text-xs text-ink-2">Enter repair costs and attach the assessment sheet, then submit.</p>
+    <>
+      {handoff}
+    <section className="action-panel assess-panel">
+      <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+        <h2 className="flex items-center gap-2 font-display text-[16px] font-bold text-ink">
+          <Wrench size={16} className="text-accent" />
+          Cost analysis
+        </h2>
+        <p className="mt-1 text-xs leading-relaxed text-ink-2">
+          Enter the total repair cost and upload the estimate sheet — a photo of the written
+          estimate, or a PDF.
+        </p>
+      </div>
 
-      {/* Repair lines */}
-      <div className="label mb-2">Repair items</div>
-      <div className="space-y-2">
-        {lines.map((l) => (
-          <div key={l.key} className="flex items-center gap-2">
-            <input
-              className="field text-sm"
-              placeholder="e.g. Gearbox overhaul"
-              value={l.description}
-              onChange={(e) => setLine(l.key, { description: e.target.value })}
+      <div className="space-y-3.5 px-4 py-3.5 sm:px-5">
+        {/* ---- The number ----
+            The one thing typed, so it is sized like the one thing that matters:
+            a full-width field with the currency inline and a big numeral. */}
+        <div>
+          <label htmlFor="repair-cost" className="label mb-1.5">
+            Total repair cost
+          </label>
+          <div className="money-field">
+            <span className="money-prefix">Tk</span>
+            <NumberField
+              id="repair-cost"
+              className="money-input tnum"
+              value={repairCost}
+              onChange={setRepairCost}
+              placeholder="0"
             />
-            <input
-              className="field w-28 text-sm tnum"
-              type="number"
-              inputMode="numeric"
-              placeholder="Tk"
-              value={l.amount}
-              onChange={(e) => setLine(l.key, { amount: e.target.value })}
-            />
-            <button
-              type="button"
-              onClick={() => removeLine(l.key)}
-              aria-label="Remove line"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-3 hover:text-bad disabled:opacity-30"
-              disabled={lines.length === 1}
-            >
-              <Trash2 size={16} />
-            </button>
           </div>
-        ))}
-      </div>
-      <button type="button" onClick={addLine} className="btn btn-ghost btn-sm mt-2.5">
-        <Plus size={15} /> Add item
-      </button>
+          <p className="mt-1.5 text-[11.5px] leading-snug text-ink-3">
+            The figure on the estimate sheet. The Service Manager approves against this.
+          </p>
+        </div>
 
-      {/* Transport / other */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
+        {/* ---- The sheet ---- */}
         <div>
-          <label className="label mb-1.5">Transport (Tk)</label>
-          <input className="field text-sm tnum" type="number" inputMode="numeric" value={transport} onChange={(e) => setTransport(e.target.value)} placeholder="0" />
-        </div>
-        <div>
-          <label className="label mb-1.5">Other (Tk)</label>
-          <input className="field text-sm tnum" type="number" inputMode="numeric" value={other} onChange={(e) => setOther(e.target.value)} placeholder="0" />
-        </div>
-      </div>
+          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <span className="label mb-0">Repair estimate sheet</span>
+            <span className="font-mono text-[10px] text-ink-3">
+              {sheetCount === 0 ? "required" : `${sheetCount} attached`}
+            </span>
+          </div>
 
-      {/* Totals */}
-      <div className="mt-4 rounded-lg bg-surface-2 p-3.5 text-sm">
-        <div className="flex justify-between text-ink-2">
-          <span>Repair</span>
-          <span className="tnum">{taka(repairTotal)}</span>
-        </div>
-        <div className="mt-1.5 flex justify-between border-t border-rule pt-1.5 font-semibold text-ink">
-          <span>Estimate total</span>
-          <span className="tnum">{taka(grandTotal)}</span>
-        </div>
-      </div>
-
-      {/* Assessment sheets */}
-      <div className="mt-4">
-        <div className="label mb-2">Assessment sheets</div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files?.length) addSheets(e.target.files);
-            e.target.value = "";
-          }}
-        />
-        <div className="grid grid-cols-4 gap-2">
-          {sheets.map((s) => (
-            <SheetTile key={s.id} src={s.url} onRemove={() => removeExisting(s.id)} done />
-          ))}
-          {newSheets.map((s) => (
-            <SheetTile
-              key={s.key}
-              src={s.preview}
-              status={s.status}
-              onRemove={() => setNewSheets((n) => n.filter((x) => x.key !== s.key))}
-            />
-          ))}
           <button
             type="button"
-            onClick={() => fileRef.current?.click()}
-            className="grid aspect-square place-items-center rounded-lg border-2 border-dashed border-rule-strong bg-surface-2 text-ink-3 active:scale-95"
+            className="sheet-drop"
+            onClick={() => sheetRef.current?.click()}
+            disabled={uploading}
+            data-empty={sheetCount === 0}
           >
-            <Camera size={20} />
+            <span className="sheet-drop-glyph">
+              {uploading ? <Loader2 size={18} className="animate-spin" /> : <FileUp size={18} />}
+            </span>
+            <span className="min-w-0 flex-1 text-left">
+              <span className="sheet-drop-title">
+                {uploading ? "Uploading…" : sheetCount === 0 ? "Add the estimate" : "Add another"}
+              </span>
+              <span className="sheet-drop-sub">PDF, or a photo of the written sheet</span>
+            </span>
+          </button>
+          <input
+            ref={sheetRef}
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) addSheets(e.target.files);
+              e.target.value = "";
+            }}
+          />
+
+          {(sheets.length > 0 || newSheets.length > 0) && (
+            <ul className="sheet-list mt-2.5">
+              {sheets.map((s) => (
+                <li key={s.id} className="sheet-item">
+                  <SheetFace url={s.url} />
+                  <span className="min-w-0 flex-1">
+                    <span className="sheet-name">
+                      {isPdfUrl(s.url) ? "Estimate (PDF)" : "Estimate (photo)"}
+                    </span>
+                    <a
+                      href={s.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="sheet-open"
+                    >
+                      Open
+                    </a>
+                  </span>
+                  <button
+                    type="button"
+                    className="sheet-x"
+                    onClick={() => removeExisting(s.id)}
+                    aria-label="Remove this sheet"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </li>
+              ))}
+
+              {newSheets.map((s) => (
+                <li key={s.key} className="sheet-item" data-state={s.status}>
+                  {s.isPdf || !s.preview ? (
+                    <span className="sheet-face" data-pdf>
+                      <FileText size={16} />
+                    </span>
+                  ) : (
+                    <span className="sheet-face">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={s.preview} alt="" />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="sheet-name">{s.fileName}</span>
+                    <span className="sheet-state">
+                      {s.status === "busy" ? (
+                        <>
+                          <Loader2 size={10} className="animate-spin" /> uploading
+                        </>
+                      ) : s.status === "error" ? (
+                        "failed — remove and try again"
+                      ) : (
+                        <>
+                          <Check size={10} strokeWidth={3} /> ready
+                        </>
+                      )}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="sheet-x"
+                    onClick={() => dropNew(s.key)}
+                    disabled={s.status === "busy"}
+                    aria-label="Remove this upload"
+                  >
+                    <X size={13} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* ---- What the work is ----
+            The sheet carries the itemisation. This is the one line the Service
+            Manager reads on screen before deciding, and the line an as-is
+            listing shows a buyer if the work never happens. */}
+        <div>
+          <label htmlFor="repair-note" className="label mb-1.5">
+            What needs doing <span className="text-ink-3">(optional)</span>
+          </label>
+          <textarea
+            id="repair-note"
+            rows={2}
+            maxLength={500}
+            className="field resize-none text-sm"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. Gearbox rebuild and offside body panel work"
+          />
+        </div>
+
+        {/* ---- The other two costs ---- */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="transport" className="label mb-1.5">
+              Transport (Tk)
+            </label>
+            <NumberField
+              id="transport"
+              className="field tnum text-sm"
+              value={transport}
+              onChange={setTransport}
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <label htmlFor="other" className="label mb-1.5">
+              Other (Tk)
+            </label>
+            <NumberField
+              id="other"
+              className="field tnum text-sm"
+              value={other}
+              onChange={setOther}
+              placeholder="0"
+            />
+          </div>
+        </div>
+
+        {error && (
+          <div className="flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-bad-ink">
+            <AlertCircle size={15} className="mt-0.5 shrink-0" />
+            <span className="text-xs font-medium">{error}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ---- Pinned submit bar ----
+          Adding a sheet must never push Submit off the end of a scroll. */}
+      <div className="assess-bar">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
+            Estimate total
+          </span>
+          <span className="font-display text-[19px] font-bold tnum text-ink">
+            {taka(grandTotal)}
+          </span>
+        </div>
+        <div className="mt-2.5 flex gap-2">
+          <button
+            className="btn btn-ghost flex-1"
+            onClick={() => save(false)}
+            disabled={busy !== null || uploading}
+          >
+            {busy === "draft" ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            Save draft
+          </button>
+          <button
+            className="btn btn-primary flex-1"
+            onClick={() => save(true)}
+            disabled={busy !== null || !ready}
+            title={
+              ready
+                ? "Send to the Service Manager"
+                : "Enter the cost and attach the estimate sheet first"
+            }
+          >
+            {busy === "submit" ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <>
+                Submit <Send size={15} />
+              </>
+            )}
           </button>
         </div>
       </div>
-
-      {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-bad">
-          <AlertCircle size={15} className="mt-0.5 shrink-0" />
-          <span className="text-xs font-medium">{error}</span>
-        </div>
-      )}
-
-      <div className="mt-4 grid grid-cols-2 gap-2.5">
-        <button className="btn btn-ghost" onClick={() => save(false)} disabled={busy !== null}>
-          {busy === "draft" ? <Loader2 size={16} className="animate-spin" /> : "Save draft"}
-        </button>
-        <button className="btn btn-primary" onClick={() => save(true)} disabled={busy !== null}>
-          {busy === "submit" ? <Loader2 size={16} className="animate-spin" /> : "Submit"}
-        </button>
-      </div>
     </section>
+    </>
   );
 }
 
-function SheetTile({
-  src,
-  status,
-  done,
-  onRemove,
-}: {
-  src: string;
-  status?: "busy" | "done" | "error";
-  done?: boolean;
-  onRemove: () => void;
-}) {
+/** A saved sheet's thumbnail — the page for an image, a document mark for a PDF. */
+function SheetFace({ url }: { url: string }) {
+  if (isPdfUrl(url)) {
+    return (
+      <span className="sheet-face" data-pdf>
+        <FileText size={16} />
+      </span>
+    );
+  }
   return (
-    <div className="relative aspect-square overflow-hidden rounded-lg border border-rule">
+    <a href={url} target="_blank" rel="noreferrer" className="sheet-face">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="Assessment sheet" loading="lazy" width={320} height={320} className="h-full w-full object-cover" />
-      {status === "busy" && (
-        <div className="absolute inset-0 grid place-items-center bg-black/45">
-          <Loader2 size={16} className="animate-spin text-white" />
-        </div>
-      )}
-      {(done || status === "done") && (
-        <div className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-ok text-white">
-          <Check size={10} strokeWidth={3} />
-        </div>
-      )}
-      {status === "error" && (
-        <div className="absolute inset-0 grid place-items-center bg-bad/70 text-[10px] font-semibold text-white">
-          Failed
-        </div>
-      )}
-      {status !== "busy" && (
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Remove sheet"
-          className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-ink text-white"
-        >
-          <X size={10} strokeWidth={3} />
-        </button>
-      )}
-    </div>
+      <img src={url} alt="Estimate sheet" />
+    </a>
   );
 }

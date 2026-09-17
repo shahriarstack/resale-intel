@@ -1,0 +1,294 @@
+# Hosting Resale Intel on cPanel
+
+Everything needed to put a release on a cPanel account, in the order it has to
+happen. Read the whole of **Step 4** before you run anything: the database
+migration can silently destroy every officer's territory if its steps are run
+out of order, and there is no error when that happens — the coverage board
+simply reports an unstaffed country.
+
+---
+
+## What the host has to provide
+
+| | |
+| --- | --- |
+| **Node** | 20.9 or newer. Next 16 refuses to start below it. Set it in cPanel → Setup Node.js App. |
+| **MySQL / MariaDB** | Any version cPanel offers. The app uses no vendor-specific features. |
+| **Passenger** | What cPanel's Node.js App runs. Nothing else is needed — no PM2, no reverse proxy of your own. |
+| **Disk** | ~250 MB for the application, plus the photographs. A capture carries up to eleven images at up to 8 MB each. |
+
+---
+
+## Step 1 — Build and package
+
+On your machine:
+
+```bash
+npm run build
+```
+
+```bash
+powershell -File zip_standalone.ps1
+```
+
+That produces `standalone.zip` (~100 MB). The packaging script is not
+cosmetic — it removes three things that must never reach a server, and each of
+them caused a real failure before it did:
+
+- **`.env`** — Next's standalone output copies the project's own `.env` into
+  the bundle. Extracting it on the host overwrites the server's environment
+  with `mysql://root@127.0.0.1/resale_local` and `NEXTAUTH_URL=localhost:3001`.
+- **`uploads/`** — the local photograph store. Shipping it drops files into the
+  live upload directory that no vehicle record points at, so the retention
+  sweep can never remove them.
+- **Orphaned Prisma engines** — a `prisma generate` that cannot rename its temp
+  file (which happens whenever the dev server is holding the DLL) leaves a
+  ~24 MB `.tmp<pid>` behind, and the tracer copies every one. Twenty-six of
+  them once turned a 200 MB output into 733 MB.
+
+It adds `deploy/` and `prisma/schema.prisma`, so the database work in Step 4
+can be done on the server with nothing installed.
+
+---
+
+## Step 2 — Upload
+
+Either use the script:
+
+```bash
+powershell -File deploy.ps1
+```
+
+It needs five variables in the environment — it no longer carries the cPanel
+password, which the previous version did, on four lines, in a folder that gets
+zipped and shared:
+
+```bash
+$env:CPANEL_HOST="s1.example.com:2083"; $env:CPANEL_USER="acct"; $env:CPANEL_PASS="..."; $env:CPANEL_PATH="/home/acct/public_html/resale"; $env:CPANEL_SITE_URL="https://resale.example.com"
+```
+
+Prefer a **cPanel API token** over the account password.
+
+Or do it by hand: upload `standalone.zip` in File Manager, extract it into the
+application directory, and touch `tmp/restart.txt`.
+
+---
+
+## Step 3 — Configure the application
+
+In cPanel → **Setup Node.js App**:
+
+| Field | Value |
+| --- | --- |
+| Application root | the directory you extracted into |
+| Application URL | the subdomain |
+| Application startup file | **`server.js`** |
+| Node version | 20.9+ |
+
+`server.js` is the one Next generates inside the standalone output. The old
+hand-written `server.js` at the project root is not used and is not shipped.
+
+Then set the environment variables **in that panel** — Passenger starts the app
+with those, not with your shell's:
+
+```
+DATABASE_URL=mysql://user:password@localhost:3306/dbname
+NEXTAUTH_SECRET=<48 random bytes, base64>
+NEXTAUTH_URL=https://resale.example.com
+UPLOAD_DIR=/home/<account>/resale-uploads
+```
+
+Four things about these:
+
+- **`NEXTAUTH_SECRET` is the only real secret in the system.** Anyone who knows
+  it can mint a valid session for any role, including Super Admin. Generate it,
+  do not compose it: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`.
+  Changing it later signs everybody out, which is the correct response to
+  suspecting it leaked.
+- **`NEXTAUTH_URL` must match what people actually type, scheme included.**
+  Sessions are cookies; `https://` and `http://` are different origins.
+- **`UPLOAD_DIR` must be outside the application directory.** Unset, photographs
+  land in `./uploads` inside the release, and the next deployment that replaces
+  that directory destroys every capture photo, repair estimate and handover shot
+  in the system — with the records intact and the images simply gone. Create it
+  first: `mkdir -p /home/<account>/resale-uploads`.
+- **A password containing `]`, `)`, `@` or `/` must be percent-encoded** inside
+  `DATABASE_URL`.
+
+If you keep a `.env` file instead, `update_env.ps1` writes one from environment
+variables and refuses an `UPLOAD_DIR` inside the deployment directory.
+
+---
+
+## Step 4 — The database
+
+> **Do not run `prisma db push` first.** The schema in this release has no
+> `User.territoryId` column — an officer's territories are `TerritoryPosting`
+> rows now, because one column could not say that somebody is covering a vacant
+> patch next door. `db push` therefore creates the new table *and drops the old
+> column with everything in it* in a single pass. There is no moment in
+> between, so a backfill run afterwards has nothing left to read.
+
+**Back the database up first**, from cPanel → Backup, or:
+
+```bash
+mysqldump -u user -p dbname > resale-before-migration.sql
+```
+
+Then, from the application directory:
+
+```bash
+node deploy/00-inspect.mjs
+```
+
+It changes nothing and prints exactly which of the steps below are still
+needed — read from the database rather than from anyone's memory of what was
+deployed last. Run it again after each step.
+
+### 4a. Snapshot, before anything else
+
+```bash
+node deploy/01-snapshot-postings.mjs
+```
+
+Copies `User.territoryId` into a side table, `_posting_snapshot`, which the
+push does not know about and will not touch. It matches that table's collation
+to `User.id` — without which the backfill dies on "Illegal mix of collations"
+halfway through, with the old column already gone.
+
+Safe on an already-migrated database: it says so and writes nothing.
+
+### 4b. Push the schema
+
+The Prisma CLI is a dev dependency and is not in the release, so install it for
+the moment you need it:
+
+```bash
+npm install prisma@6 --no-save && npx prisma db push
+```
+
+If the host has no outbound npm access, enable **Remote MySQL** for your IP in
+cPanel and run `npx prisma db push` from your own machine with `DATABASE_URL`
+pointed at the server.
+
+### 4c. Restore the postings
+
+```bash
+node deploy/02-backfill-postings.mjs
+```
+
+Reads the snapshot and writes a **BASE** posting for each officer — where they
+work. COVER, a vacant neighbouring patch somebody has picked up, is a decision
+an admin makes in the users console; nothing in the old single-column data
+could have distinguished the two.
+
+Idempotent, and conservative: an officer who already holds that territory is
+left exactly as they are, including its kind, so re-running can never demote a
+COVER back to BASE. It reports any snapshot row it could not restore because
+the officer or the territory no longer exists — those people have no patch
+until one is set in the console.
+
+`_posting_snapshot` is left in place on purpose. It is the only record of what
+the old column held. Drop it once the coverage board looks right.
+
+### 4c-ii. Newer columns
+
+`node deploy/00-inspect.mjs` also reports whether `Vehicle.repairBlocker`
+exists — the reason a repair is blocked, added after the first release. It is
+additive and nullable, so the `db push` in 4b creates it without touching a
+row; the inspector flags it because a release whose code expects a column its
+database has not got fails on the engineer's bench, which is not where anybody
+looks first.
+
+### 4d. Realign the sign-in credentials
+
+```bash
+node deploy/03-align-credentials.mjs
+```
+
+**Without this, nobody can sign in.** Sign-in is now a role plus the Staff ID as
+the passcode, and every account minted under the old rule carries a hash of a
+password nobody will ever type again. The login route checks the hash rather
+than trusting the lookup — deliberately — so those accounts are refused with
+the same message as a wrong passcode, and no screen anywhere would report why.
+
+Safe to re-run, and worth re-running after any bulk change that touched Staff
+IDs outside the admin console.
+
+### 4e. Seed, only on an empty database
+
+```bash
+node deploy/00-inspect.mjs
+```
+
+If this is a fresh database rather than an upgrade, it will show no users at
+all. Seed from your own machine against the server (`npm run db:seed`, with
+`DATABASE_URL` pointed at it) — the seed is a dev dependency script and is not
+in the release.
+
+---
+
+## Step 5 — TLS
+
+Get the certificate (cPanel → SSL/TLS Status → Run AutoSSL), force HTTPS, and
+set `NEXTAUTH_URL` to the `https://` form.
+
+This is not optional housekeeping. Sign-in sends a Staff ID and a passcode, and
+the session cookie that comes back is the whole of somebody's authority in the
+system; over `http://` both cross the network in clear, on yard wifi and mobile
+networks.
+
+---
+
+## Step 6 — Check it
+
+```bash
+curl -sI https://resale.example.com/login
+```
+
+Then sign in as one real account of each surface — one field role on a phone,
+one desk role on a monitor — and check three things the migration touches:
+
+1. **Coverage** (`/coverage`) lists officers against territories, with no patch
+   showing an officer who should not be there.
+2. An ARO's territory dropdown on an intake form offers **only their own**
+   patches, base first.
+3. A capture photo uploads and renders, which proves `UPLOAD_DIR` is writable
+   and served.
+
+---
+
+## Post-sale photo retention
+
+Photographs of sold vehicles are deleted after **7 days**; the records, costs
+and event history stay. The sweep runs inside the application: 30 seconds after
+boot, then every six hours.
+
+Passenger spinning the app down when idle and back up on the next request makes
+this *more* reliable, not less — the boot sweep fires on nearly every wake. A
+Super Admin can also see what the next sweep will take, and run it now, from
+the admin console.
+
+---
+
+## Deploying again later
+
+Steps 1–2, then `tmp/restart.txt`. Step 4 only when the schema has changed —
+`node deploy/00-inspect.mjs` will tell you.
+
+The upload directory is outside the release and survives. The database is
+untouched by a deploy.
+
+---
+
+## Things that will bite
+
+| Symptom | Cause |
+| --- | --- |
+| App starts, every sign-in fails | Credentials not realigned — Step 4d. |
+| Everyone signed out after a deploy | `NEXTAUTH_SECRET` changed, or `.env` was overwritten. |
+| Sign-in loops back to `/login` | `NEXTAUTH_URL` does not match the address in the browser, usually `http` vs `https`. |
+| Photographs vanish after a deploy | `UPLOAD_DIR` was unset, so they were inside the release. |
+| Coverage board shows nobody anywhere | `db push` ran before the snapshot. Restore the backup and start Step 4 again. |
+| "Illegal mix of collations" | A `_posting_snapshot` left by an older copy of the script. Drop it and re-run 4a. |
+| 503 from Passenger | Read `stderr.log` in the application directory; usually Node version or a missing `DATABASE_URL`. |

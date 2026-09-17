@@ -2,11 +2,22 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { taka } from "@/lib/format";
+import { NumberField } from "@/components/ui/NumberField";
 
 export interface EditableLine {
   key: string;
   description: string;
   amount: string;
+  /**
+   * Photo the Service Engineer attached to this line, if any.
+   *
+   * Carried through the editor read-only. The Service Manager adjusts an estimate
+   * by replacing every line, so this has to survive the round trip or their
+   * edit silently destroys the engineer's evidence. They can see it; they
+   * cannot add or change it, because it is the engineer's record of what they
+   * found.
+   */
+  photoName?: string | null;
 }
 
 let seq = 0;
@@ -19,7 +30,11 @@ export function linesTotal(lines: EditableLine[]): number {
 export function cleanLines(lines: EditableLine[]) {
   return lines
     .filter((l) => l.description.trim() || l.amount)
-    .map((l) => ({ description: l.description.trim(), amount: parseFloat(l.amount) || 0 }));
+    .map((l) => ({
+      description: l.description.trim(),
+      amount: parseFloat(l.amount) || 0,
+      photoName: l.photoName ?? undefined,
+    }));
 }
 
 // Controlled add/remove list of description + amount rows, with a live total.
@@ -45,19 +60,32 @@ export function CostLineEditor({
       <div className="space-y-2">
         {lines.map((l) => (
           <div key={l.key} className="flex items-center gap-2">
+            {/* The engineer's evidence for this line. Shown, not editable —
+                and carried through the save so adjusting the price does not
+                delete the photograph of the part being paid for. */}
+            {l.photoName && (
+              <a
+                href={`/api/files/${l.photoName}`}
+                target="_blank"
+                rel="noreferrer"
+                className="line-thumb"
+                title="Photo attached by the engineer — open full size"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/api/files/${l.photoName}`} alt="" width={72} height={72} />
+              </a>
+            )}
             <input
               className="field text-sm"
               placeholder={placeholder}
               value={l.description}
               onChange={(e) => setLine(l.key, { description: e.target.value })}
             />
-            <input
+            <NumberField
               className="field w-28 text-sm tnum"
-              type="number"
-              inputMode="numeric"
               placeholder="Tk"
               value={l.amount}
-              onChange={(e) => setLine(l.key, { amount: e.target.value })}
+              onChange={(v) => setLine(l.key, { amount: v })}
             />
             <button
               type="button"

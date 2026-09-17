@@ -7,17 +7,13 @@ import {
   Search,
   Truck,
   CornerDownLeft,
-  Sun,
-  Moon,
-  Monitor,
   LogOut,
   Loader2,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 import { getNavItems } from "@/components/shell/navConfig";
-import { useTheme } from "@/components/theme/ThemeProvider";
 import { statusLabel } from "@/lib/status";
-import { vehicleTitle } from "@/lib/vehicle";
+import { accountTitle } from "@/lib/vehicle";
 import type { VehicleStatus } from "@prisma/client";
 
 interface VehicleHit {
@@ -46,9 +42,20 @@ interface Command {
  * live vehicle search hit against the existing role-scoped list endpoint.
  * Search is debounced because it runs per keystroke against the database.
  */
+/**
+ * How anything else asks for the palette.
+ *
+ * Exported as a function rather than as a bare string so callers cannot get
+ * the event name subtly wrong and fail silently.
+ */
+export const COMMAND_PALETTE_EVENT = "ri:command-palette";
+
+export function openCommandPalette(): void {
+  document.dispatchEvent(new CustomEvent(COMMAND_PALETTE_EVENT));
+}
+
 export function CommandPalette({ role }: { role: Role }) {
   const router = useRouter();
-  const { setChoice } = useTheme();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<VehicleHit[]>([]);
@@ -64,7 +71,11 @@ export function CommandPalette({ role }: { role: Role }) {
     setCursor(0);
   }, []);
 
-  // Open / close on the global chord.
+  // Open / close on the global chord, or on a request from elsewhere in the
+  // shell. The custom event exists so the sidebar's "Search anything" button
+  // can open this without synthesising a fake keypress — a synthetic
+  // KeyboardEvent would work today and break silently the moment this
+  // listener starts caring about anything real on the event.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
@@ -74,8 +85,13 @@ export function CommandPalette({ role }: { role: Role }) {
       }
       if (e.key === "Escape") setOpen(false);
     };
+    const onRequest = () => setOpen(true);
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener(COMMAND_PALETTE_EVENT, onRequest);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener(COMMAND_PALETTE_EVENT, onRequest);
+    };
   }, []);
 
   useEffect(() => {
@@ -130,39 +146,6 @@ export function CommandPalette({ role }: { role: Role }) {
       },
     }));
 
-    const theme: Command[] = [
-      {
-        id: "theme:light",
-        group: "Theme",
-        label: "Switch to light",
-        icon: <Sun size={16} />,
-        run: () => {
-          setChoice("light");
-          close();
-        },
-      },
-      {
-        id: "theme:dark",
-        group: "Theme",
-        label: "Switch to dark",
-        icon: <Moon size={16} />,
-        run: () => {
-          setChoice("dark");
-          close();
-        },
-      },
-      {
-        id: "theme:system",
-        group: "Theme",
-        label: "Match system theme",
-        icon: <Monitor size={16} />,
-        run: () => {
-          setChoice("system");
-          close();
-        },
-      },
-    ];
-
     const account: Command[] = [
       {
         id: "acct:signout",
@@ -176,8 +159,8 @@ export function CommandPalette({ role }: { role: Role }) {
       },
     ];
 
-    return [...nav, ...theme, ...account];
-  }, [role, router, setChoice, close]);
+    return [...nav, ...account];
+  }, [role, router, close]);
 
   const filteredCommands = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -196,7 +179,9 @@ export function CommandPalette({ role }: { role: Role }) {
     const vehicleCommands: Command[] = shownHits.map((v) => ({
       id: `veh:${v.id}`,
       group: "Vehicles",
-      label: vehicleTitle(v),
+      // The palette searches the operations product, so a result is named
+      // the way the operations product names things: by account.
+      label: accountTitle(v),
       hint: `${v.registrationNo} · ${v.customerName} · ${statusLabel(v.status)}`,
       icon: <Truck size={16} />,
       run: () => {

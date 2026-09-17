@@ -14,7 +14,7 @@ export default function Error({
   return (
     <div className="grid min-h-[80vh] place-items-center px-6">
       <div className="card-lg w-full max-w-md p-8 text-center">
-        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-bad-soft text-bad">
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-bad-soft text-bad-ink">
           <AlertTriangle size={24} />
         </div>
         <h1 className="font-display text-2xl font-bold text-ink">Something went wrong</h1>

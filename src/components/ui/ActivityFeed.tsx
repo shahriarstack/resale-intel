@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { EventType, VehicleStatus } from "@prisma/client";
 import {
   Camera,
+  PackageCheck,
   Pencil,
   Mail,
   UserPlus,
@@ -26,6 +27,8 @@ import {
   Unlock,
   Gavel,
   Trophy,
+  ShieldCheck,
+  ImageOff,
   Activity,
   ArrowRight,
   type LucideIcon,
@@ -33,6 +36,7 @@ import {
 import { EVENT_META } from "@/lib/events";
 import { STATUS_META, type Tone } from "@/lib/status";
 import { timeAgo, dateTime } from "@/lib/format";
+import { useIsClient } from "@/lib/useIsClient";
 
 export interface FeedEvent {
   id: string;
@@ -72,7 +76,15 @@ const ICONS: Record<EventType, LucideIcon> = {
   LOCKED: Lock,
   UNLOCKED: Unlock,
   BID_PLACED: Gavel,
+  BID_REVISED: Pencil,
+  BID_WITHDRAWN: Undo2,
   SALE_AWARDED: Trophy,
+  REPAIR_PROGRESS: Wrench,
+  SOLD_AS_IS: PackageCheck,
+  HANDOVER_SUBMITTED: Camera,
+  REGISTRATION_VALIDITY_SET: ShieldCheck,
+  REGISTRATION_VALIDITY_RENEWED: ShieldCheck,
+  PHOTOS_PURGED: ImageOff,
 };
 
 function toneColor(tone: Tone): string {
@@ -130,11 +142,17 @@ export function ActivityFeed({
   emptyLabel?: string;
 }) {
   // Relative times and Today/Yesterday depend on the clock, so they are only
-  // rendered once mounted — the server pass shows absolute dates instead.
-  const [mounted, setMounted] = useState(false);
+  // rendered in the browser — the server pass shows absolute dates instead.
+  const mounted = useIsClient();
+
+  // "20h ago" goes stale while the page sits open, so the feed re-renders on a
+  // minute tick. The counter has to actually change: this was previously a
+  // second `setMounted(true)` on an interval, which React bails out of once
+  // the value is already true — so the timer ran every minute for the life of
+  // the page and never refreshed a single timestamp.
+  const [, setTick] = useState(0);
   useEffect(() => {
-    setMounted(true);
-    const t = setInterval(() => setMounted(true), 60_000);
+    const t = setInterval(() => setTick((n) => n + 1), 60_000);
     return () => clearInterval(t);
   }, []);
 
@@ -211,7 +229,7 @@ function FeedRow({
   return (
     <li
       className="relative pb-4 pl-5 last:pb-0"
-      style={{ animation: `slideInRight 0.2s ease ${Math.min(index, 12) * 0.03}s both` }}
+      style={{ animation: `slideInRight 0.2s var(--ease-out-quart) ${Math.min(index, 12) * 0.03}s both` }}
     >
       {/* icon sits on the rail */}
       <span

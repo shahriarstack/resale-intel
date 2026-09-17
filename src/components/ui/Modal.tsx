@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useIsClient } from "@/lib/useIsClient";
 
 /**
  * Portal-based modal.
@@ -36,8 +37,8 @@ export function Modal({
   closeOnBackdrop?: boolean;
   closeOnEscape?: boolean;
 }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // This portals into document.body, which does not exist during SSR.
+  const mounted = useIsClient();
 
   // Escape closes, and the page beneath stops scrolling while the dialog is open.
   useEffect(() => {

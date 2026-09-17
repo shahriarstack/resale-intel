@@ -5,14 +5,19 @@ import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, Pencil, X, Upload, Undo2 } from "lucide-react";
 import { sendJSON } from "@/lib/http";
 import { taka } from "@/lib/format";
+import { NumberField } from "@/components/ui/NumberField";
+import { HandoffDialog } from "@/components/ui/HandoffDialog";
 import { ActionModal, type PendingAction } from "@/components/vehicle/ActionModal";
 
 export function GmApprovalPanel({
   vehicleId,
+  subject,
   parts,
   currentPrice,
 }: {
   vehicleId: string;
+  /** Names the vehicle on the hand-off receipt. */
+  subject: string;
   parts: { repair: number; transport: number; other: number; registration: number; sop: number; total: number };
   currentPrice: number | null;
 }) {
@@ -21,6 +26,7 @@ export function GmApprovalPanel({
   const [price, setPrice] = useState(currentPrice != null ? String(currentPrice) : "");
   const [busy, setBusy] = useState<null | "save" | "approve">(null);
   const [error, setError] = useState("");
+  const [handedOff, setHandedOff] = useState(false);
   const [sendBack, setSendBack] = useState<PendingAction | null>(null);
 
   const original = currentPrice ?? 0;
@@ -53,7 +59,7 @@ export function GmApprovalPanel({
     try {
       if (changed) await savePrice();
       await sendJSON(`/api/vehicles/${vehicleId}/transition`, "POST", { action: "PUSH_LIVE" });
-      router.push("/dashboard");
+      setHandedOff(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Approval failed");
       setBusy(null);
@@ -66,10 +72,32 @@ export function GmApprovalPanel({
     setError("");
   };
 
+  const handoff = (
+    <HandoffDialog
+      open={handedOff}
+      title="Approved for resale"
+      subject={subject}
+      facts={[
+        { label: "Total cost", value: taka(parts.total) },
+        { label: "Selling price", value: taka(value), strong: true },
+        {
+          label: "Margin",
+          value: marginPct === null ? taka(margin) : `${taka(margin)} · ${marginPct.toFixed(1)}%`,
+        },
+      ]}
+      nextDesk="Sales Team"
+      nextAction="It is live on the marketplace now and open for customer offers."
+      thanks="Thank you — that is the last gate. Eight desks got this vehicle here, and you just put it on the market."
+      onContinue={() => router.push("/dashboard")}
+    />
+  );
+
   return (
+    <>
+      {handoff}
     <section className="action-panel p-5">
       <h2 className="mb-1 font-display text-[15px] font-bold text-ink">Final approval</h2>
-      <p className="mb-4 text-xs text-ink-2">Confirm the selling price — override it if needed — then push live for resale.</p>
+      <p className="mb-4 text-xs text-ink-2">Confirm the selling price, override it if needed, then push live for resale.</p>
 
       {/* Cost breakdown */}
       <div className="rounded-lg bg-surface-2 p-3.5 text-sm">
@@ -104,13 +132,10 @@ export function GmApprovalPanel({
         ) : (
           <div className="mt-2 flex items-center gap-2">
             <span className="font-display text-xl font-bold text-ink-3">Tk</span>
-            <input
+            <NumberField
               className="field tnum text-2xl font-bold"
-              type="number"
-              inputMode="numeric"
-              min={0}
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              onChange={setPrice}
               autoFocus
             />
           </div>
@@ -120,7 +145,7 @@ export function GmApprovalPanel({
         <div className="mt-2.5 flex items-center justify-between">
           <span
             className="rounded-md px-2 py-1 font-mono text-[11px] font-semibold"
-            style={margin >= 0 ? { background: "var(--ok-soft)", color: "var(--ok)" } : { background: "var(--bad-soft)", color: "var(--bad)" }}
+            style={margin >= 0 ? { background: "var(--ok-soft)", color: "var(--ok-ink)" } : { background: "var(--bad-soft)", color: "var(--bad-ink)" }}
           >
             Margin {taka(margin)}{marginPct !== null ? ` (${marginPct.toFixed(1)}%)` : ""}
           </span>
@@ -139,7 +164,7 @@ export function GmApprovalPanel({
       )}
 
       {error && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-bad">
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-bad-ink">
           <AlertCircle size={15} className="mt-0.5 shrink-0" />
           <span className="text-xs font-medium">{error}</span>
         </div>
@@ -177,6 +202,7 @@ export function GmApprovalPanel({
         />
       )}
     </section>
+    </>
   );
 }
 

@@ -1,13 +1,17 @@
-import { ok, fail, withGuard } from "@/lib/api";
+import { ok, fail, withGuard, assertMoved } from "@/lib/api";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { registrationSchema } from "@/lib/validation";
 import { canRunAction } from "@/lib/rbac";
 import { recordEvent } from "@/lib/audit";
-import { taka } from "@/lib/format";
+import { taka, shortDate } from "@/lib/format";
+import { DEFAULT_VALID_DAYS } from "@/lib/registrationValidity";
 
 // Registration Team: itemised registration costs. `submit` runs
-// COMPLETE_REGISTRATION → REGISTRATION_DONE. Draft saves keep the file put.
+// COMPLETE_REGISTRATION → REGISTRATION_DONE and opens the paperwork validity
+// window (default two months, or whatever they chose). Draft saves keep the
+// file put and touch nothing about validity — there is nothing to validate
+// yet.
 export const POST = withGuard(
   async (request: Request, context: { params: Promise<{ id: string }> }) => {
     const user = await requireRole("REGISTRATION_TEAM");
@@ -48,7 +52,22 @@ export const POST = withGuard(
       await tx.costing.upsert({ where: { vehicleId: id }, update: {}, create: { vehicleId: id } });
 
       if (data.submit) {
-        await tx.vehicle.update({ where: { id }, data: { status: "REGISTRATION_DONE" } });
+        const validDays = data.validDays ?? DEFAULT_VALID_DAYS;
+        const validUntil = new Date();
+        validUntil.setDate(validUntil.getDate() + validDays);
+        validUntil.setHours(23, 59, 59, 0);
+
+        // Guarded on REPAIR_APPROVED, the status this completion was
+        // authorised against, so a resubmission cannot re-complete the desk.
+        const moved = await tx.vehicle.updateMany({
+          where: { id, status: "REPAIR_APPROVED" },
+          data: {
+            status: "REGISTRATION_DONE",
+            registrationValidUntil: validUntil,
+            registrationValidDays: validDays,
+          },
+        });
+        assertMoved(moved.count);
         await recordEvent(tx, {
           vehicleId: id,
           actorId: user.id,
@@ -56,6 +75,14 @@ export const POST = withGuard(
           fromStatus: "REPAIR_APPROVED",
           toStatus: "REGISTRATION_DONE",
           note: `Registration cost ${taka(total)}`,
+        });
+        await recordEvent(tx, {
+          vehicleId: id,
+          actorId: user.id,
+          type: "REGISTRATION_VALIDITY_SET",
+          field: "registrationValidUntil",
+          newValue: shortDate(validUntil),
+          note: `Valid ${validDays} day${validDays === 1 ? "" : "s"}`,
         });
       }
     });

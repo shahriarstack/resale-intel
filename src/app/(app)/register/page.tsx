@@ -1,73 +1,81 @@
 import { redirect } from "next/navigation";
-import type { PhotoSlot } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/session";
-import { computeBreakdown } from "@/lib/costing";
-import { canPlaceBid, canViewAllBids } from "@/lib/rbac";
-import { vehicleTitle, vehicleMake } from "@/lib/vehicle";
-import { standingOffers, type BidRow } from "@/lib/bids";
-import { RegisterClient, type MarketVehicle } from "@/components/register/RegisterClient";
+import { canPlaceBid, canViewAllBids, isStorefrontRole, offerLevel } from "@/lib/rbac";
+import { readCycle, isFreshListing } from "@/lib/resale";
+import { locationName, vehicleTitle, vehicleMake } from "@/lib/vehicle";
+import { liveOffers, type OfferRow } from "@/lib/bids";
+import { OFFER_SELECT, shapeOffer } from "@/lib/offerQuery";
+import { buildGallery } from "@/lib/photos";
+import { Storefront, type Listing } from "@/components/register/Storefront";
 
 export const dynamic = "force-dynamic";
 
-// Which shot best represents the vehicle on a listing card.
-const HERO_ORDER: PhotoSlot[] = ["FRONT", "LEFT", "RIGHT", "BACK", "CABIN", "SLEEP"];
+// Which photographs a listing shows, and what the buyer is told about them,
+// both come from lib/photos. A repaired vehicle is sold from the engineer's
+// post-repair set; an as-is vehicle is sold from the recovery set, labelled as
+// such. Paperwork never reaches the shop window.
 
-function heroPhoto(photos: { slot: PhotoSlot; url: string }[]): string | null {
-  for (const slot of HERO_ORDER) {
-    const hit = photos.find((p) => p.slot === slot);
-    if (hit) return hit.url;
-  }
-  return photos[0]?.url ?? null;
-}
-
-export default async function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  // ?v=<id> opens that vehicle's listing straight away. Sales officers are
+  // redirected here from a vehicle link, and landing on an unfiltered grid
+  // after clicking one specific truck would lose them.
+  searchParams: Promise<{ v?: string }>;
+}) {
+  const { v: openId } = await searchParams;
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  const seesAllBids = canViewAllBids(user.role);
+  const seesAllOffers = canViewAllBids(user.role);
+  const storefront = isStorefrontRole(user.role);
 
   const vehicles = await prisma.vehicle.findMany({
     where: { status: { in: ["LIVE_FOR_RESALE", "SOLD"] } },
     orderBy: { updatedAt: "desc" },
     include: {
-      costing: true,
-      repairLines: { select: { amount: true } },
-      regLines: { select: { amount: true } },
+      costing: { select: { approvedPrice: true, repairNote: true } },
       territory: { select: { name: true } },
+      currentLocation: { select: { name: true } },
       photos: { select: { slot: true, url: true } },
-      bids: {
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          amount: true,
-          note: true,
-          createdAt: true,
-          bidderId: true,
-          bidder: { select: { name: true, staffId: true } },
-        },
-      },
+      bids: { orderBy: { createdAt: "desc" }, select: OFFER_SELECT },
     },
   });
 
-  const data: MarketVehicle[] = vehicles.map((v) => {
-    const b = computeBreakdown(v.costing, v.repairLines, v.regLines);
+  // The roster the offer form picks from. Sales works one shared marketplace,
+  // so whoever is at the screen has to say whose customer an offer is — and
+  // the list is small enough to ship with the page rather than fetch on open.
+  const salesOfficers = await prisma.user.findMany({
+    where: { role: "SALES_TEAM", isActive: true },
+    orderBy: [{ salesTerritory: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, staffId: true, salesTerritory: true },
+  });
 
-    const allBids: BidRow[] = v.bids.map((x) => ({
-      id: x.id,
-      amount: x.amount,
-      note: x.note,
-      createdAt: x.createdAt.toISOString(),
-      bidderId: x.bidderId,
-      bidderName: x.bidder.name,
-      bidderStaffId: x.bidder.staffId,
-      isMine: x.bidderId === user.id,
-    }));
+  const data: Listing[] = vehicles.map((v) => {
+    const offers: OfferRow[] = v.bids.map((x) => shapeOffer(x, user.id));
 
-    const offers = standingOffers(allBids);
-    const mine = offers.find((o) => o.isMine) ?? null;
+    const live = liveOffers(offers);
+    const mine = live.filter((o) => o.isMine);
     const sold = v.status === "SOLD";
-    const winning = sold ? allBids.find((x) => x.id === v.winningBidId) ?? null : null;
+    // A listed vehicle whose pricing month has run out is visible but closed.
+    const cycle = readCycle(v.resaleCycleEndsAt);
+    const winning = sold ? offers.find((x) => x.id === v.winningBidId) ?? null : null;
+    const { shots, provenance } = buildGallery(v.photos, v.asIs);
+    // An as-is vehicle is sold with its faults known and unrepaired. Saying so
+    // in the listing is not a courtesy: the estimate that documents them is the
+    // reason the price is what it is, and a buyer who finds out afterwards is
+    // a buyer who does not come back.
+    //
+    // The engineer now writes one line rather than itemising, so the
+    // disclosure is that line, split on the separators people actually use.
+    const knownFaults =
+      v.asIs && v.costing?.repairNote
+        ? v.costing.repairNote
+            .split(/[;\n]|,\s/)
+            .map((f) => f.trim())
+            .filter(Boolean)
+        : [];
 
     return {
       id: v.id,
@@ -76,35 +84,51 @@ export default async function RegisterPage() {
       year: v.year,
       mileage: v.mileage,
       registrationNo: v.registrationNo,
+      registrationValidUntil: v.registrationValidUntil?.toISOString() ?? null,
       grade: v.grade,
       territory: v.territory?.name ?? null,
-      updatedAt: v.updatedAt.toISOString(),
-      imageUrl: heroPhoto(v.photos),
-      photoCount: v.photos.length,
-      approvedPrice: b.approvedPrice,
+      // Where the vehicle physically IS. The one a buyer asks about, and a
+      // different question from the recovery territory above — that is the
+      // ARO's patch, which says who seized it, not where it is parked.
+      location: locationName(v),
+      hasSleeperCabin: v.hasSleeperCabin,
+      listedAt: v.updatedAt.toISOString(),
+      isNew: !sold && isFreshListing(v.updatedAt),
+      images: shots,
+      provenance,
+      knownFaults,
+      price: v.costing?.approvedPrice ?? null,
       sold,
+      onHold: !sold && cycle.onHold,
 
-      // Own bid is always visible to the person who placed it.
-      myBid: mine ? { amount: mine.amount, createdAt: mine.createdAt } : null,
-      myBidCount: allBids.filter((x) => x.isMine).length,
+      // An officer always reads back what they submitted, whatever their role.
+      myOffers: mine,
 
-      // Sealed: the size of the book is management-only while bidding is open.
-      topBid: seesAllBids ? offers[0]?.amount ?? null : null,
-      bidderCount: seesAllBids ? offers.length : null,
+      // The book itself is management-only while the sale is open. Field roles
+      // get a count of *their own* offers and nothing about anyone else's.
+      offers: seesAllOffers ? live : [],
+      offerCount: seesAllOffers ? live.length : null,
+      topOffer: seesAllOffers ? live[0]?.amount ?? null : null,
 
       // Once a sale closes the outcome is public to the team.
       soldAt: v.soldAt?.toISOString() ?? null,
-      winningAmount: winning?.amount ?? null,
-      winnerName: winning?.bidderName ?? null,
-      iWon: winning ? winning.isMine : null,
+      soldAmount: winning?.amount ?? null,
+      soldCustomer: winning?.customerName ?? null,
+      soldVia: winning?.officerName ?? null,
+      iBroughtIt: winning ? winning.isMine : false,
     };
   });
 
   return (
-    <RegisterClient
-      vehicles={data}
-      canBid={canPlaceBid(user.role, "LIVE_FOR_RESALE")}
-      seesAllBids={seesAllBids}
+    <Storefront
+      listings={data}
+      canOffer={canPlaceBid(user.role, "LIVE_FOR_RESALE")}
+      seesOfferBook={seesAllOffers}
+      storefront={storefront}
+      viewerLevel={offerLevel(user.role)}
+      openId={openId ?? null}
+      salesOfficers={salesOfficers}
+      viewerId={user.id}
     />
   );
 }

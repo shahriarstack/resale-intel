@@ -1,4 +1,4 @@
-import { ok, fail, withGuard } from "@/lib/api";
+import { ok, fail, withGuard, assertMoved } from "@/lib/api";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { priceSchema } from "@/lib/validation";
@@ -41,7 +41,13 @@ export const POST = withGuard(
       });
 
       if (isFirstApproval) {
-        await tx.vehicle.update({ where: { id }, data: { status: "PRICE_APPROVED" } });
+        // Guarded on SOP_ADDED — the status the approval was authorised
+        // against — so a double submission approves the price once.
+        const moved = await tx.vehicle.updateMany({
+          where: { id, status: "SOP_ADDED" },
+          data: { status: "PRICE_APPROVED" },
+        });
+        assertMoved(moved.count);
         await recordEvent(tx, {
           vehicleId: id,
           actorId: user.id,

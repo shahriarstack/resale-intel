@@ -1,0 +1,1321 @@
+/* ===========================================================================
+   ARO PANEL — the hero slab, inset-grouped queue, floating dock
+
+   Loaded last, so it is allowed to override 10-field and 12-polish. It is a
+   restyle of three things on the officer's screen and deliberately touches
+   nothing else:
+
+     1. the summary block, from a flat card to a lit slab carrying the house
+        gradient, a tyre-track watermark and a live radar
+     2. the attention list, into an Apple inset-grouped list
+     3. the mobile tab strip, into a floating dock with a centre action
+
+   What carries over from the previous pass, because it was right and is easy
+   to lose in a restyle:
+
+     - Motion is earned or absent. Two loops on this screen — the radar sweep
+       on the hero and the halo on a genuinely late row — and both stop dead
+       under prefers-reduced-motion, which is honoured at the bottom of this
+       file rather than per-rule.
+     - Nothing that pulses may change layout. Every animation here moves
+       opacity, transform on an absolutely-positioned layer, or a box-shadow.
+       Growing a badge nudges the text beside it and a row that shifts while
+       you read it is worse than a row that does nothing.
+     - A halo is a box-shadow, never a `z-index: -1` pseudo-element. A negative
+       child paints behind the nearest stacking context's background — here a
+       card — so it renders correctly and is covered up.
+   ======================================================================== */
+
+@layer components {
+  /* ---- The field panel's display face ----
+     Jakarta for headings and figures on this panel only; the desk consoles
+     keep the system stack. SF still leads, so on an iPhone the officer gets
+     the real system face and never downloads anything. */
+  .aro-page,
+  .dock {
+    --font-display-field: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+      "SF Pro", var(--font-jakarta), var(--font-inter), system-ui, sans-serif;
+  }
+
+  /* =======================================================================
+     THE FIELD PANEL'S ACCENT IS BLUE
+     Once the summary slab stopped running through violet, every accent
+     surface around it — the dock's centre action, the active tab, the tab
+     pills, the primary button on a capture card — was still indigo, and an
+     indigo button under a blue-to-green panel reads as a screen assembled
+     from two products.
+
+     ONE OVERRIDE, not forty. The accent is a token set, so retuning it here
+     retints every accent surface on the phone at once and leaves no rule to
+     be found and updated later. Blue is also what the panel is already
+     saying: the slab's first stop is #1d4ed8 and the button now answers it.
+
+     SCOPED TO `.shell-mobile`, which is the field shell — the header, the
+     pages and the dock, all three, because the dock lives outside `.aro-page`
+     and a blue page under a violet action button would be worse than leaving
+     both alone. The desk consoles keep the product's indigo; they are a
+     different surface and nothing here reaches them.
+
+     This does mean the Service Engineer and Sales phone panels turn blue too.
+     That is deliberate: they share this shell, and one field role in a
+     different accent from the other two is not a theme, it is a bug nobody
+     filed. */
+  /* `body:has(.shell-mobile)`, not `.shell-mobile` alone.
+     Modals portal into `document.body` — outside the field shell entirely —
+     so a dialog opened from the phone panel inherited the desk's indigo and
+     put a violet primary button on a blue screen. Declaring the tokens on the
+     body ELEMENT while the field shell is what is mounted covers the shell and
+     every portal that escapes it, and leaves the desk consoles (which have no
+     `.shell-mobile`) exactly as they were. */
+  body:has(.shell-mobile),
+  .shell-mobile {
+    --accent: #1d5fd4;
+    --accent-2: #2a6fe4;
+    --accent-ink: #1a4aa0;
+    --accent-soft: #dbe7fb;
+    --accent-soft-2: #cfdff9;
+    --accent-line: #b0caf3;
+    --accent-ink-on-soft: #1c4c9e;
+    --on-accent: #ffffff;
+
+    /* THE COMPOSED TOKENS HAVE TO BE REDECLARED, NOT INHERITED.
+       A custom property's computed value has its `var()` references
+       substituted where it is DEFINED, not where it is used — so
+       `--grad-accent`, declared on `:root` as a ramp between `--accent-2` and
+       `--accent`, inherits down here as a literal indigo gradient and ignores
+       the eight lines above it entirely. The primary button stayed violet on
+       a blue panel and nothing in the cascade explained why. Anything built
+       FROM the accent has to be rebuilt here beside it. */
+    --grad-accent: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 72%);
+    --grad-tint-accent: linear-gradient(180deg, var(--accent-soft), var(--accent-soft-2));
+  }
+
+  /* =======================================================================
+     1 — THE HEADER
+     The name was 25px and the loudest thing on the screen. It does not need
+     to be: the officer knows who they are, and the figure below is what they
+     opened the app to read. Both header lines are now quiet, and the weight
+     they gave up has gone into the obsidian slab.
+     ==================================================================== */
+  .aro-greet {
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 2px;
+  }
+
+  /* Greeting and name share a baseline. `min-width: 0` on the row and the
+     name is what lets a long name truncate instead of pushing the date tile
+     off the right edge. */
+  .aro-greet-line {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .aro-greet-eyebrow {
+    flex: none;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink-3);
+    opacity: 0.85;
+  }
+
+  .aro-greet-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-display-field);
+    /* Small, tight and heavy — the combination that reads as considered
+       rather than merely shrunk. A light 15px name looks like a caption; a
+       700 15px name with negative tracking looks like a masthead. */
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.011em;
+    line-height: 1.15;
+    color: var(--ink);
+  }
+
+  /* ---- The date, reduced to one line ----
+     It was a 54px bordered tile with a 20px numeral — furniture, for a value
+     nobody makes a decision on. It is now a single quiet line that still
+     answers the only question asked of it: which day is the letter ladder
+     counting from. */
+  .aro-datetile {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+  }
+  .aro-datetile-dow,
+  .aro-datetile-mon {
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-indent: 0.1em;
+    color: var(--ink-3);
+    opacity: 0.7;
+  }
+  .aro-datetile-day {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-2);
+  }
+
+  /* =======================================================================
+     2 — THE SLAB
+     The house gradient, treated as a lit material rather than as a filled
+     rectangle. Four layers, each doing a job the others cannot:
+
+       base      the blue→indigo→violet→teal→green gradient, oversized so it
+                 has somewhere to drift to
+       veil      a 3px dot lattice at low alpha — the micro-texture that stops
+                 a large flat area from looking like a printed swatch
+       sheen     one soft off-centre highlight, the reflection that makes it
+                 read as a surface with a light on it
+       edge      a 1px inset top highlight over a falling-away rim, which is
+                 the whole trick behind Apple's glass: light catches the top
+                 edge and the bottom drops into shadow
+
+     There were five. A tyre-track watermark ran corner to corner under all of
+     it, and what it was really doing was covering an empty right-hand half —
+     decoration hired to solve a layout problem. The space now carries the
+     longest-off-road reading and the proportion bar, so the panel has texture
+     that can be read instead of texture that can only be noticed.
+
+     An earlier pass ran this in near-black "obsidian". It was a handsome
+     slab and it stated nothing: this block is the one place in the product
+     where the brand is at full strength, and a dark rectangle threw that
+     away. What survived the revert is everything above except the base —
+     none of the material depended on the colour being dark.
+     ==================================================================== */
+  .aro-slab {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: 22px;
+    color: #fff;
+
+    /* The house gradient — blue through indigo and violet into the two
+       greens. This is the product's colour, used here rather than the
+       near-black the first pass tried: the panel is the one place the brand
+       is stated at full strength, and an obsidian slab stated nothing.
+
+       What the obsidian pass contributed and this keeps is the MATERIAL: the
+       dot lattice, the single sheen, and the caught top edge below. Those are
+       what make it read as a lit surface instead of a coloured rectangle, and
+       none of them depended on the colour being dark.
+
+       220% wide so the stops have somewhere to travel. At 100% the drift has
+       no effect at all, which is the usual reason this technique looks
+       broken. */
+    /* BLUE INTO GREEN, with the violet taken out of the middle.
+       The ramp ran blue → indigo → violet → teal → green, which put its most
+       saturated, least natural stop dead centre — the eye reads that as a
+       third colour laid over the other two rather than as one surface
+       travelling. Blue to green through teal is the same journey with the
+       argument removed: adjacent hues, one continuous shift, and the figures
+       on top stay the only high-contrast thing on the panel. */
+    background-color: #1668c9;
+    background-image: linear-gradient(
+      114deg,
+      #1d4ed8 0%,
+      #1a6ed2 26%,
+      #0f8cb2 58%,
+      #10a07e 84%,
+      #13a468 100%
+    );
+    background-size: 220% 100%;
+    background-position: 0% 50%;
+
+    box-shadow:
+      /* the caught top edge, then the falling-away rim */
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 14px 32px -16px rgba(67, 56, 202, 0.62),
+      0 2px 10px -4px rgba(30, 27, 75, 0.32);
+
+    /* Two animations, not two loops fighting: the entrance runs once and the
+       drift is the 18-second one that is deliberately at the edge of
+       perception — you notice it after glancing away and back, rather than
+       while looking at it. */
+    animation:
+      aroSlabIn 0.62s var(--ease-out-expo) both,
+      aroDrift 18s ease-in-out infinite alternate;
+  }
+
+  /* ---- Micro-dot texture ----
+     A 3px lattice, deliberately at the threshold of visibility: it should
+     register as grain when you look for it and as nothing when you do not.
+     Masked to fade toward the bottom, so the figures at the top sit on the
+     busiest part and the caption at the bottom sits on clean colour. */
+  .aro-slab::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    /* 0.10, not the 0.055 the dark version used. The same lattice that reads
+       as grain on near-black is invisible on a mid-tone gradient. */
+    background-image: radial-gradient(rgba(255, 255, 255, 0.1) 0.5px, transparent 0.5px);
+    background-size: 3px 3px;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.55) 55%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.55) 55%, transparent 100%);
+  }
+
+  /* ---- The sheen ----
+     One highlight, off-centre and soft. Two would read as a reflection of
+     something specific and start describing a light source the rest of the
+     panel does not have. */
+  .aro-slab::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    width: 300px;
+    height: 300px;
+    right: -104px;
+    top: -142px;
+    border-radius: 999px;
+    pointer-events: none;
+    background: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.13) 0%,
+      rgba(255, 255, 255, 0.05) 42%,
+      transparent 70%
+    );
+  }
+
+  /* Everything the officer actually reads sits above the texture layers. */
+  .aro-slab > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* =======================================================================
+     THE RADAR
+     A live indicator, not decoration: it says the figure beside it is the
+     book as it stands right now. Two rings expand and fade on a 2.8s offset
+     pair, around a solid centre dot.
+
+     Built as absolutely-positioned rings inside a fixed 34px box, so the
+     sweep can scale to 3x without moving a single pixel of layout. The dot
+     stays put and only the rings travel — a pulsing dot next to a number
+     drags the eye off the number.
+     ==================================================================== */
+  .aro-radar {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    /* Small on purpose. The first pass ran a 34px box out to 3x — a 102px
+       circle that crossed the headline figure and read as a stray ring
+       somebody had left on the card. The sweep has to stay inside the label's
+       own line to be an indicator rather than an ornament. */
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+  .aro-radar-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: #34d399;
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.8);
+  }
+  .aro-radar-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(52, 211, 153, 0.5);
+    opacity: 0;
+    animation: aroRadar 2.8s var(--ease-out-quart) infinite;
+  }
+  /* The second ring is the same animation half a cycle late, which is what
+     makes it read as a repeating sweep rather than a single blip. */
+  .aro-radar-ring:nth-child(3) {
+    animation-delay: 1.4s;
+  }
+
+  /* ---- Figures on the slab ---- */
+  /* Every alpha below is raised from the dark version. White at 0.5 sits on
+     near-black at roughly 8:1 and on this gradient at under 2:1 — the same
+     value that read as "quiet" there reads as "smudged" here. */
+  .aro-slab-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.72);
+  }
+  .aro-slab-figure {
+    margin-top: 2px;
+    font-family: var(--font-display-field);
+    /* 38, down from 44. It is still by some distance the largest thing on the
+       screen — which is the job — and the four figures under it did not need
+       the extra six pixels of headroom to stay subordinate. */
+    font-size: 38px;
+    font-weight: 800;
+    line-height: 0.94;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    /* A shadow DOWN rather than a glow out. On the dark slab a soft white
+       halo lifted the numeral off the stone; on a mid-tone gradient the same
+       halo just fogs the edges, and what the figure needs here is to sit on
+       the colour rather than float above it. */
+    text-shadow: 0 2px 12px rgba(23, 20, 70, 0.28);
+  }
+
+  /* The titled block. A mark, the label, and the live dot on one row — the
+     label used to begin at the padding edge with nothing anchoring it, which
+     on a full-bleed gradient reads as type floating on colour. */
+  .aro-slab-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .aro-slab-mark {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 19px;
+    height: 19px;
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.17);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  /* The footnote, on a surface of its own. */
+  .aro-slab-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 11px;
+    padding: 7px 9px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    font-size: 9.5px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  /* ---- The two halves of the headline ----
+     The big figure answers "how many"; the block on the right answers "for how
+     long", which is the question that follows it every time. They share a
+     baseline row rather than stacking, because the right-hand half of this
+     panel used to be empty — that emptiness is what the tyre-track watermark
+     existed to hide, and a second reading fills it with something worth
+     having instead. */
+  .aro-slab-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  /* Right-aligned, and a third of the figure beside it. A footnote to the
+     headline, never a competitor: two large numerals on one row would make the
+     officer choose which one is the subject of the panel. */
+  .aro-slab-aside {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    /* No rule between the halves any more. A hairline was holding two things
+       apart that the alignment already separates, and once the right-hand side
+       became a tappable target the line read as its left edge — a border on
+       three-quarters of a button. */
+    padding: 2px 0 2px 12px;
+    border-radius: 12px;
+  }
+  .aro-slab-aside-label {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.66);
+  }
+  .aro-slab-aside-chev {
+    margin-right: -2px;
+    opacity: 0.8;
+  }
+  .aro-slab-aside-figure {
+    margin-top: 3px;
+    font-family: var(--font-display-field);
+    font-size: 21px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+  }
+  /* The unit is set down rather than omitted. "94" alone on this panel would
+     be read as a count of vehicles, which is what every other numeral here is. */
+  .aro-slab-aside-unit {
+    margin-left: 1px;
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0.7;
+  }
+  /* The registration, as a chip. Small mono at 58% white on a moving gradient
+     is a smudge; a chip gives it a surface and makes it read as a label on a
+     specific vehicle rather than as a caption. */
+  .aro-slab-aside-reg {
+    margin-top: 5px;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.01em;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  /* ---- The headline, drawn to scale ----
+     Three segments in the order of the three cells below, sized by
+     `flex-grow` on the counts themselves — so the proportions cannot drift
+     from the figures, and a category at zero simply takes no width instead of
+     needing a special case.
+
+     Three values of white, not three hues: the slab already carries the house
+     gradient and a second palette on top of it would be the panel arguing with
+     itself. The row of labelled cells underneath is the legend. */
+  .aro-scale {
+    display: flex;
+    gap: 2px;
+    margin-top: 11px;
+    height: 5px;
+  }
+  .aro-scale-seg {
+    min-width: 3px;
+    border-radius: 999px;
+    /* Grows from nothing on arrival, in the same beat as the entrance — the
+       bar drawing itself is what says it is a measurement rather than a rule.
+       Transform, so nothing re-lays out mid-animation. */
+    transform-origin: left center;
+    animation: aroScaleIn 0.7s var(--ease-out-quart) 0.16s both;
+  }
+  .aro-scale-1 {
+    background: rgba(255, 255, 255, 0.92);
+  }
+  .aro-scale-2 {
+    background: rgba(255, 255, 255, 0.54);
+  }
+  .aro-scale-3 {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  @keyframes aroScaleIn {
+    from {
+      transform: scaleX(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aro-scale-seg {
+      animation: none;
+    }
+  }
+
+  /* The four-figure row, divided by hairlines. */
+  .aro-cell + .aro-cell {
+    border-left-color: rgba(255, 255, 255, 0.22);
+  }
+  .aro-cell--apart {
+    border-left-color: rgba(255, 255, 255, 0.42) !important;
+  }
+  .aro-slab .aro-cell-figure {
+    font-family: var(--font-display-field);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .aro-slab .aro-cell-label {
+    margin-top: 5px;
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    line-height: 1.25;
+    color: rgba(255, 255, 255, 0.66);
+  }
+  .aro-slab .aro-cell--apart .aro-cell-label {
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  /* =======================================================================
+     THE MATERIAL
+     Softer corners, softer plates, softer shadow. Everything here is a small
+     move and the set of them is the whole difference between "a card" and "a
+     surface": the panel already had the right structure, it was stating it a
+     little too firmly.
+     ==================================================================== */
+  /* `.card` is in here too. The engineer's bench is built on the shared card
+     rather than on `.aro-card`, and a panel whose summary block and attention
+     list are 20px while the work below them is 18px reads as two screens
+     stacked. Scoping it to `.aro-page` leaves every desk console alone. */
+  .aro-page .aro-card,
+  .aro-page .card,
+  .aro-page .aro-group {
+    /* 20/22px, not 16/18. A radius reads as a squircle rather than as a
+       rounded rectangle at roughly an eighth of the card's height, and every
+       card on this screen is short. */
+    border-radius: 20px;
+    box-shadow:
+      0 1px 2px rgba(20, 22, 40, 0.04),
+      0 6px 18px -10px rgba(20, 22, 40, 0.16);
+  }
+  .aro-page .aro-plate,
+  .aro-page .aro-glyph {
+    /* The plate follows the card. A 10px plate inside a 20px card is a
+       different family of shape, and the eye reads the mismatch long before
+       it can say what is wrong. */
+    border-radius: 11px;
+    /* 11%, down from 12–13. On white the old mix was a step short of a solid
+       swatch behind a coloured glyph; a lighter tint lets the drawing be the
+       colour and the plate be the surface it sits on. */
+    background: color-mix(in srgb, var(--tone, var(--accent)) 11%, var(--surface));
+  }
+  .aro-page .aro-glyph {
+    width: 32px;
+    height: 32px;
+  }
+  /* Rows breathe. 9px was chosen when four separate cards had to be squeezed
+     into one; inside a single group there is room to give each row the 11px
+     that makes a list read as settled rather than packed. */
+  .aro-page .aro-group-row {
+    padding: 11px 12px;
+    gap: 11px;
+  }
+  .aro-page .aro-group-row + .aro-group-row::before {
+    left: 55px;
+  }
+
+  /* =======================================================================
+     THE RECORD STRIP
+     Three readings on one row, in the height the old two-reading version
+     took. Hairline dividers rather than gaps: a gap between numbers reads as
+     three separate facts, a rule reads as one series measured three ways.
+     ==================================================================== */
+  .aro-record {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 10px 4px;
+  }
+  .aro-record-stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 0 10px;
+  }
+  .aro-record-stat + .aro-record-stat {
+    border-left: 1px solid var(--rule);
+  }
+  .aro-record-plate {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 10px;
+    color: var(--tone, var(--accent));
+  }
+  .aro-record-figure {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  /* The prior window is context for the one beside it, not a result in its
+     own right, and it is set back so the eye lands on the current figure. */
+  .aro-record-quiet {
+    color: var(--ink-3);
+  }
+  .aro-record-trend {
+    margin-left: 4px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .aro-record-label {
+    display: block;
+    margin-top: 4px;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    /* Clipped rather than spilled. Without the overflow pair the label simply
+       runs out of its third of the row and over the hairline into the next
+       reading — which is worse than an ellipsis, because it is still legible
+       enough that nobody notices it belongs to the column before. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--ink-3);
+  }
+
+  /* =======================================================================
+     THE START CHIPS
+     Three across, plate over label. See the note in AroDashboard.tsx for why
+     the sub-line is dropped at this width and comes back when they stack.
+     ==================================================================== */
+  .aro-starts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .aro-start {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 11px 6px 10px;
+    text-align: center;
+  }
+  .aro-start-plate {
+    width: 32px;
+    height: 32px;
+    flex: none;
+  }
+  .aro-start-text {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+  .aro-start-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--ink);
+    /* Wraps to two lines rather than truncating. "Capture request" does not
+       fit on one line in a third of a 375px screen, and half a word is not a
+       label — the chip is sized for two lines so the wrap costs nothing. */
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+  .aro-start-chev {
+    flex: none;
+    margin-right: -3px;
+    color: var(--ink-3);
+    opacity: 0.75;
+  }
+  .aro-start-sub {
+    display: none;
+  }
+
+  /* Under 340px three chips leave ~100px each, which is not enough for
+     "Capture request" at any size worth reading. They become full-width rows
+     again, and the sub-line — which is the part that explains what a capture
+     request IS — comes back with the room to hold it. */
+  @media (max-width: 339px) {
+    /* The eyebrow gained a mark and a radar, and at 320px the three of them
+       squeeze "Off the road" onto two lines — a two-word title wrapping above
+       a 38px numeral reads as a layout that ran out of room, which it has.
+       The label holds its line and the row tightens around it instead. */
+    .aro-slab-eyebrow {
+      gap: 5px;
+    }
+    .aro-slab-label {
+      white-space: nowrap;
+    }
+    .aro-slab-head {
+      gap: 8px;
+    }
+    .aro-record-stat {
+      gap: 6px;
+      padding: 0 7px;
+    }
+    .aro-record-label {
+      letter-spacing: 0.03em;
+    }
+
+    /* "ACCIDENT" is 60px of tracked capitals in a 62px cell at this width, so
+       it was breaking after the seventh letter and leaving a lone "T" on the
+       second line. Tightening the tracking buys back the four pixels; the
+       labels are the one place on the slab where the letter-spacing is
+       decoration rather than legibility. */
+    .aro-slab .aro-cell-label {
+      letter-spacing: 0.03em;
+    }
+
+    .aro-starts {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
+    .aro-start {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      text-align: left;
+    }
+    .aro-start-text {
+      flex: 1;
+    }
+    .aro-start-title {
+      font-size: 12px;
+      overflow-wrap: normal;
+    }
+    .aro-start-sub {
+      display: block;
+      margin-top: 2px;
+      font-size: 10.5px;
+      line-height: 1.25;
+      color: var(--ink-3);
+    }
+  }
+
+  /* =======================================================================
+     3 — THE ATTENTION QUEUE, AS AN INSET-GROUPED LIST
+     iOS Settings, not a table. Three things make that pattern what it is and
+     all three are easy to get wrong:
+
+       - the group is one rounded container on a tinted ground, not a set of
+         cards with gaps
+       - separators are INSET to where the text starts, never full-bleed. A
+         full-bleed rule cuts the group into pieces; an inset one reads as a
+         list continuing
+       - the row is the tap target, and it fills the group edge to edge
+     ==================================================================== */
+  .aro-group {
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow:
+      inset 0 0 0 1px rgba(16, 24, 40, 0.045),
+      0 1px 2px rgba(16, 24, 40, 0.045),
+      0 6px 16px -10px rgba(16, 24, 40, 0.12);
+    overflow: hidden;
+  }
+
+  .aro-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* The gap above a section heading is doing the separating on this screen,
+       so it stays clearly larger than the gap below it — 18/6 rather than an
+       even pair, which would make the heading float between two groups
+       instead of belonging to the one under it. */
+    margin: 18px 4px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    /* The two children are the label and the count; the rule goes between
+       them, which is why it is a pseudo-element on the header rather than a
+       border under it. A rule UNDER a heading draws a line across the screen
+       and cuts the page into slabs; a rule running OUT of the heading to meet
+       its count ties the two ends of the row together and leaves the page
+       whole. It also stops the count looking like a stray numeral floating at
+       the right margin. */
+    gap: 10px;
+  }
+  .aro-group-header::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    order: 1;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--ink-3) 34%, transparent), transparent 92%);
+  }
+  /* The COUNT is moved past the rule, not "the last child" — with only a
+     label present that selector matched the label itself and pushed the
+     heading to the right-hand margin. `nth-child(2)` matches the count and
+     nothing else, and a pseudo-element is not a child, so a section with no
+     count simply gets label-then-rule. */
+  .aro-group-header > span:nth-child(2) {
+    order: 2;
+  }
+
+  /* The separator, inset to the text column. 52px = 12px padding + 30px glyph
+     + 10px gap, so the line starts exactly where the label starts. It has to
+     be recomputed whenever the glyph resizes — that arithmetic is the whole
+     reason the inset looks deliberate rather than approximate.
+
+     Drawn as a positioned pseudo-element rather than a border, for two
+     reasons: a border would add a pixel to the row's height and shift its
+     content against the first row's, and a line that simply starts at 54px
+     says what it means. (The first pass drew a full-width inset box-shadow
+     and then painted a 54px patch of --surface back over its left end, which
+     worked and was one background-colour change away from breaking.) */
+  .aro-group-row + .aro-group-row::before {
+    content: "";
+    position: absolute;
+    left: 52px;
+    right: 0;
+    top: 0;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  .aro-group-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    /* 9px, down from 11. Three rows in a group, so every pixel here is
+       tripled — and the glyph tile already sets the row's minimum height, so
+       trimming the padding costs nothing until it drops below that. */
+    padding: 9px 12px;
+    background: var(--surface);
+    transition:
+      background-color 0.18s var(--ease-standard),
+      transform 0.24s var(--ease-spring);
+  }
+  .aro-group-row:active {
+    background: var(--surface-2);
+    transform: scale(0.988);
+  }
+
+  /* The glyph tile. Squircle-ish and tinted from the row's own --tone, which
+     is how the category stays recognisable before the label is legible —
+     the thing that matters most at arm's length in sunlight. */
+  .aro-glyph {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 10px;
+    color: var(--tone, var(--accent));
+    background: color-mix(in srgb, var(--tone, var(--accent)) 12%, var(--surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone, var(--accent)) 16%, transparent);
+  }
+
+  .aro-group-title {
+    font-family: var(--font-display-field);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.008em;
+    line-height: 1.25;
+    color: var(--ink);
+  }
+  .aro-group-sub {
+    margin-top: 1px;
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--ink-3);
+  }
+
+  /* ---- Warm status pills ----
+     A pill, not the old square badge, and warm rather than saturated: a tinted
+     ground with the tone's own ink on it. A solid block of colour at the end
+     of every row turned the list into a row of traffic lights, where only
+     some of them meant anything. */
+  .aro-pill {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    flex: none;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-family: var(--font-display-field);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: color-mix(in srgb, var(--tone, var(--accent)) 72%, #1a1206);
+    background: color-mix(in srgb, var(--tone, var(--accent)) 15%, #fffaf3);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone, var(--accent)) 22%, transparent);
+  }
+
+  /* Genuinely late. The halo is on the pill's shadow so nothing moves. */
+  /* THE ALERT BADGE IS A TINT, NOT A BLOCK.
+     It used to invert — solid saturated fill, white numeral — which on a
+     screen of white cards made three of the four rows carry a hard coloured
+     dot and turned an exception into the normal state of the list. The tint
+     is simply stronger than a calm row's, the numeral darker, and the pulse
+     below still marks what is genuinely late. The hue was always the part
+     carrying the meaning; the fill was volume. */
+  .aro-pill.aro-alert {
+    color: color-mix(in srgb, var(--tone, var(--accent)) 82%, #160d04);
+    background: color-mix(in srgb, var(--tone, var(--accent)) 26%, #fffaf3);
+    box-shadow: none;
+    animation: aroHalo 2.4s ease-out infinite;
+  }
+
+  /* =======================================================================
+     4 — THE FLOATING DOCK
+     Detached from the bottom edge, rounded, and floating on the same glass
+     the header uses. The centre action is raised into a disc that breaks the
+     dock's top edge, which is what makes it read as the primary control
+     rather than a fifth tab.
+     ==================================================================== */
+  .dock {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    width: calc(100% - 24px);
+    max-width: 440px;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 2px;
+    /* Compact. The dock is pinned over every screen, so like the top bar its
+       height is taken from the work rather than added to the page. It lands
+       at ~49px, which is also where iOS puts a tab bar — the platform arrived
+       at that number for the same reason, and a label under an icon does not
+       need more. */
+    padding: 5px 7px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      inset 0 0 0 1px rgba(16, 24, 40, 0.07),
+      0 10px 30px -10px rgba(16, 24, 40, 0.22),
+      0 2px 8px -3px rgba(16, 24, 40, 0.12);
+    animation: aroDockIn 0.5s var(--ease-out-expo) both;
+  }
+
+  /* A browser without backdrop-filter would show the page scrolling through a
+     translucent bar, so those get an opaque dock instead. */
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .dock {
+      background: var(--surface);
+    }
+  }
+
+  .dock-item {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 2px 4px;
+    border-radius: 13px;
+    color: var(--ink-3);
+    transition:
+      color 0.18s var(--ease-standard),
+      background-color 0.18s var(--ease-standard),
+      transform 0.26s var(--ease-spring);
+  }
+  .dock-item:active {
+    transform: scale(0.93);
+  }
+  .dock-item[data-active="true"] {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+  }
+  .dock-label {
+    font-family: var(--font-display-field);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    line-height: 1;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---- The centre action ----
+     Raised so it breaks the dock's top edge. Its own colour, because it is
+     the one control here that creates something rather than navigating. */
+  .dock-add {
+    flex: none;
+    display: grid;
+    place-items: center;
+    /* Shrunk with the dock, but proportionally less: it stays the largest
+       target in the bar, and it is the only one here that is not a tab. */
+    width: 42px;
+    height: 42px;
+    margin: -12px 6px 0;
+    border-radius: 15px;
+    color: #fff;
+    /* The slab's own ramp, in miniature. It is the one other place on the
+       phone that carries the gradient rather than a flat accent, so the two
+       have to agree — this was still the old indigo→teal ramp after the panel
+       above it stopped running through violet. */
+    background-image: linear-gradient(158deg, #2f74e8 0%, #1d5fd4 48%, #0f8f77 130%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      0 8px 18px -6px rgba(67, 56, 202, 0.6),
+      0 2px 6px -2px rgba(16, 24, 40, 0.3);
+    transition: transform 0.3s var(--ease-spring), box-shadow 0.2s var(--ease-standard);
+  }
+  .dock-add:active {
+    transform: scale(0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 4px 10px -6px rgba(67, 56, 202, 0.55);
+  }
+}
+
+/* ---- Keyframes ---------------------------------------------------------- */
+
+/* The slab arrives with a little overshoot in the scale and none in the
+   position — it settles rather than bounces. */
+@keyframes aroSlabIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aroDockIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+
+/* Expand and fade. Ends at 3x, which at a 34px box is a 102px sweep — wide
+   enough to read as a radar and still inside the slab's padding. */
+/* Ends at 2.2x of a 14px box — a 31px sweep, which stays on the label's line. */
+@keyframes aroRadar {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.5);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aro-slab,
+  .dock {
+    animation: none !important;
+  }
+  /* Parked mid-travel rather than at 0%, so a reduced-motion viewer gets the
+     middle of the gradient — violet into teal — instead of the blue end the
+     drift happens to start on. */
+  .aro-slab {
+    background-position: 30% 50%;
+  }
+  /* The radar's meaning is "live", which a static ring still carries. The
+     dot and one steady ring stay; only the sweep stops. */
+  .aro-radar-ring {
+    animation: none !important;
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  .aro-radar-ring:nth-child(3) {
+    display: none;
+  }
+  .aro-pill.aro-alert {
+    animation: none !important;
+  }
+  .aro-group-row,
+  .dock-item,
+  .dock-add {
+    transition: none !important;
+  }
+  .aro-group-row:active,
+  .dock-item:active,
+  .dock-add:active {
+    transform: none !important;
+  }
+}
+
+/* ===========================================================================
+   READY FOR CAPTURE — the permit card on the officer's Captures screen
+
+   An approved capture request is the only object in this panel that is a
+   STANDING INSTRUCTION: somebody at HQ has ruled, and the vehicle is now the
+   officer's to go and take. Every other card on the screen reports a state.
+
+   So this one is built like a permit rather than a record. It carries a jade
+   band across the top — the only card in the field panel that does — and the
+   action is a full-width button rather than something to be found. The account
+   position is one line of mono, because at a roadside it is read aloud, not
+   studied.
+
+   Jade throughout, and never the accent: the accent is "the current thing" all
+   over this product, and a permit is not where you are, it is where you have
+   been told to go.
+   ======================================================================== */
+
+@layer components {
+  .ready-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--ok-line);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  /* The band. States the authority and how long it has been standing, which
+     are the two things the officer has not already been told elsewhere. */
+  .ready-band {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: var(--ok);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .ready-band-age {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    opacity: 0.85;
+  }
+
+  .ready-body {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .ready-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ready-plate {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    color: var(--ok-ink);
+    background: var(--ok-soft);
+  }
+  /* The model is the heading — the fleet is one make, so it is the load class
+     that distinguishes one unit from another. Same rule as `vehicleTitle`. */
+  .ready-model {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ready-reg {
+    margin-top: 1px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-2);
+    /* The registration identifies the vehicle and must never be truncated to
+       the point of identifying nothing — see the README's note on which of two
+       identifiers may be cut. */
+    overflow-wrap: anywhere;
+  }
+
+  .ready-facts {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+  }
+  .ready-facts dt {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .ready-facts dd {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ready-facts dd.mono {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .ready-facts > div:last-child {
+    text-align: right;
+  }
+
+  /* The ledger, on one line. Wraps rather than scrolls: three short figures
+     over two lines is readable, and a horizontal scroller inside a card on a
+     phone is a figure somebody will miss. */
+  .ready-ledger {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .ready-ledger span:nth-child(even) {
+    color: var(--ink-3);
+  }
+
+  .ready-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+
+  /* A permit nobody has acted on. Ochre, not red: the vehicle being hard to
+     find is not a failure, and colouring it as one would teach officers to
+     ignore the colour that means something has actually gone wrong. */
+  .ready-stale {
+    padding: 6px 9px;
+    border-radius: var(--radius-sm);
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+}

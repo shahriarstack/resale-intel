@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { LetterStage } from "@prisma/client";
 import { Mail, Loader2, ArrowRight, Lock, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 import { Modal, ModalHeader, ModalBody, ModalFooter } from "@/components/ui/Modal";

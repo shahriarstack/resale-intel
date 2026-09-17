@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { STATUS_META, type Tone } from "@/lib/status";
 import { ActivityFeed } from "@/components/ui/ActivityFeed";
+import { PanelHero } from "@/components/ui/PanelHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { CountUp, useCountUp } from "@/components/ui/CountUp";
 import { taka, takaCompact, number as fmtNumber, shortDate } from "@/lib/format";
 
@@ -139,6 +141,8 @@ export function AdminDashboard(props: AdminDashboardProps) {
     insight,
   } = props;
 
+  const [tab, setTab] = useState<"overview" | "analytics">("overview");
+
   const counts = useMemo(
     () => new Map(pipeline.map((p) => [p.status, p.count])),
     [pipeline],
@@ -164,197 +168,227 @@ export function AdminDashboard(props: AdminDashboardProps) {
   const empty = totals.all === 0;
 
   return (
-    <div className="mx-auto max-w-7xl px-5 py-7 sm:px-7 sm:py-8">
-      {/* ---------------------------------------------------------------- */}
-      {/* Header                                                            */}
-      {/* ---------------------------------------------------------------- */}
-      <header
-        className="mb-6 flex flex-wrap items-end justify-between gap-4"
-        style={{ animation: "fadeIn 0.24s var(--ease-standard)" }}
-      >
-        <div>
-          <div className="eyebrow text-accent">System overview</div>
-          <h1 className="page-title mt-1 text-[28px] sm:text-[32px]">
-            {greeting}, {firstName}.
-          </h1>
-          <p className="mt-1.5 text-[14px] text-ink-2">
-            {empty
-              ? "No vehicles in the system yet — the pipeline starts at field capture."
-              : `${fmtNumber(totals.active)} file${totals.active === 1 ? "" : "s"} in flight · ${fmtNumber(totals.live)} live for resale · ${fmtNumber(totals.all)} total.`}
-          </p>
+    // Same container, hero and tile grid as every other desk panel. This
+    // screen used to run its own 44px greeting, its own metric cells and its
+    // own tab control, which made the one panel a Super Admin opens first the
+    // one panel that looked like a different product.
+    <div className="mx-auto w-full max-w-[1580px] px-5 py-6 lg:px-7">
+      <div className="enter flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1" style={{ minWidth: 280 }}>
+          <PanelHero
+            eyebrow="System overview"
+            title={`${greeting}, ${firstName}.`}
+            subtitle={
+              empty
+                ? "No vehicles in the system yet — the pipeline starts at field capture."
+                : undefined
+            }
+            // The three readings that used to be one interpunct-separated
+            // sentence in the subtitle. Same numbers, given the column they
+            // were always describing.
+            facts={
+              empty
+                ? undefined
+                : [
+                    { label: "In flight", value: fmtNumber(totals.active), accent: true },
+                    { label: "Live for resale", value: fmtNumber(totals.live) },
+                    { label: "Records in total", value: fmtNumber(totals.all) },
+                  ]
+            }
+            art="desk"
+          />
         </div>
         <div className="flex items-center gap-2 rounded-full border border-rule bg-surface px-3 py-1.5">
-          <span
-            className="h-1.5 w-1.5 rounded-full"
-            style={{ background: "var(--ok)" }}
-          />
-          <span className="font-mono text-[11px] tracking-wide text-ink-3">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--ok)" }} />
+          <span className="font-mono text-[10.5px] tracking-wide text-ink-3">
             Live · {shortDate(generatedAt)}
           </span>
         </div>
-      </header>
+      </div>
 
       {empty ? (
         <GettingStarted />
       ) : (
         <>
-          {/* -------------------------------------------------------------- */}
-          {/* KPI canvas — one panel, 6 cells, hairline dividers between      */}
-          {/* -------------------------------------------------------------- */}
-          <section
-            className="card mb-4 overflow-hidden aura-glass transition-all duration-300"
-            style={{ animation: "fadeIn 0.28s var(--ease-standard) 0.02s both" }}
-          >
-            <div className="grid grid-cols-2 divide-x divide-y divide-rule sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
-              <MetricCell
-                icon={<Car size={13} />}
-                tone="neutral"
-                label="Total"
-                renderValue={<CountUp value={totals.all} />}
-                sub={`${fmtNumber(totals.sold)} sold · ${fmtNumber(totals.released)} released`}
-              />
-              <MetricCell
-                icon={<Layers size={13} />}
-                tone="accent"
-                label="In pipeline"
-                renderValue={<CountUp value={totals.active} />}
-                sub={bottleneck ? `Most at ${STATUS_META[bottleneck].heldBy}` : "All clear"}
-              />
-              <MetricCell
-                icon={<CheckCircle2 size={13} />}
-                tone="ok"
-                label="Live"
-                renderValue={<CountUp value={totals.live} />}
-                sub={totals.all > 0 ? `${Math.round((totals.live / totals.all) * 100)}% of book` : "—"}
-              />
-              <MetricCell
-                icon={<Wallet size={13} />}
-                tone="accent"
-                label="Capital"
-                renderValue={<AnimatedTaka value={money.capitalDeployed} />}
-                sub="Files in flight"
-              />
-              <MetricCell
-                icon={<TrendingUp size={13} />}
-                tone="ok"
-                label="Portfolio"
-                renderValue={<AnimatedTaka value={money.portfolioValue} />}
-                sub={`${takaCompact(money.realisedMargin)} margin`}
-              />
-              <MetricCell
-                icon={<Activity size={13} />}
-                tone={
-                  money.avgMarginPct === null ? "neutral" : money.avgMarginPct >= 0 ? "ok" : "bad"
-                }
-                label="Avg margin"
-                renderValue={
-                  money.avgMarginPct === null ? (
-                    <span>—</span>
-                  ) : (
-                    <CountUp value={money.avgMarginPct} format={(n) => `${n.toFixed(1)}%`} />
-                  )
-                }
-                sub="Across priced"
-              />
-            </div>
-          </section>
+          <div className="enter enter-1 mt-3.5 seg" role="group" aria-label="Dashboard view">
+            <button className="seg-btn" data-on={tab === "overview"} onClick={() => setTab("overview")}>
+              <Layers size={12} />
+              Overview
+            </button>
+            <button className="seg-btn" data-on={tab === "analytics"} onClick={() => setTab("analytics")}>
+              <Activity size={12} />
+              Analytics
+            </button>
+          </div>
 
-          {/* -------------------------------------------------------------- */}
-          {/* Alert strip — one card, three cells, only appears if anything   */}
-          {/* actually warrants attention                                     */}
-          {/* -------------------------------------------------------------- */}
-          {(overdue.length > 0 || stalled.length > 0 || totals.locked > 0) && (
-            <section
-              className="card mb-4 overflow-hidden aura-glass transition-all duration-300"
-              style={{ animation: "fadeIn 0.28s var(--ease-standard) 0.05s both" }}
-            >
-              <div className="grid grid-cols-1 divide-y divide-rule sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-                <AlertCell
-                  tone="bad"
-                  icon={<AlertTriangle size={13} />}
-                  count={overdue.length}
-                  label="Repairs overdue"
-                  detail={
-                    overdue.length > 0
-                      ? `Longest ${overdue[0].days}d past deadline`
-                      : "No deadlines breached"
+          {tab === "overview" ? (
+            <>
+              {/* -------------------------------------------------------------- */}
+              {/* KPI canvas — Hairline 1px grid (Ultra-premium dense layout)   */}
+              {/* -------------------------------------------------------------- */}
+              {/* The same tile the field and desk panels use. Six of them fit
+                  a wide screen in one row and fall to three, then two, without
+                  the hairline-grid card they used to sit inside — which was
+                  the other thing making this screen look unrelated. */}
+              {/* The six figures arrive in sequence rather than together.
+                  Reading order is left to right, so that is the order they
+                  land in — the cascade IS the reading order, said in motion. */}
+              <div className="stagger mt-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
+                <StatTile
+                  icon={<Car size={17} />}
+                  tint="neutral"
+                  label="Total"
+                  value={totals.all}
+                  caption={`${fmtNumber(totals.sold)} sold · ${fmtNumber(totals.released)} released`}
+                />
+                <StatTile
+                  icon={<Layers size={17} />}
+                  tint="accent"
+                  label="In pipeline"
+                  value={totals.active}
+                  caption={bottleneck ? `Most at ${STATUS_META[bottleneck].heldBy}` : "All clear"}
+                />
+                <StatTile
+                  icon={<CheckCircle2 size={17} />}
+                  tint="ok"
+                  label="Live"
+                  value={totals.live}
+                  caption={
+                    totals.all > 0 ? `${Math.round((totals.live / totals.all) * 100)}% of book` : "—"
                   }
                 />
-                <AlertCell
-                  tone="warn"
-                  icon={<Timer size={13} />}
-                  count={stalled.length}
-                  label="Files stalled 7d+"
-                  detail={
-                    stalled.length > 0
-                      ? `Longest idle ${stalled[0].days}d at one desk`
-                      : "Everything moving"
-                  }
+                <StatTile
+                  icon={<Wallet size={17} />}
+                  tint="accent"
+                  label="Capital"
+                  value={money.capitalDeployed}
+                  display={takaCompact(money.capitalDeployed)}
+                  caption="Files in flight"
                 />
-                <AlertCell
-                  tone="neutral"
-                  icon={<Lock size={13} />}
-                  count={totals.locked}
-                  label="Locked records"
-                  detail="Letter 3 / Written issued"
+                <StatTile
+                  icon={<TrendingUp size={17} />}
+                  tint="ok"
+                  label="Portfolio"
+                  value={money.portfolioValue}
+                  display={takaCompact(money.portfolioValue)}
+                  caption={`${takaCompact(money.realisedMargin)} margin`}
+                />
+                <StatTile
+                  icon={<Activity size={17} />}
+                  tint={
+                    money.avgMarginPct === null
+                      ? "neutral"
+                      : money.avgMarginPct >= 0
+                        ? "ok"
+                        : "bad"
+                  }
+                  label="Avg margin"
+                  value={money.avgMarginPct ?? 0}
+                  display={
+                    money.avgMarginPct === null ? "—" : `${money.avgMarginPct.toFixed(1)}%`
+                  }
+                  caption="Across priced"
                 />
               </div>
-            </section>
-          )}
+
+              {/* -------------------------------------------------------------- */}
+              {/* Alert strip — Hairline 1px grid                               */}
+              {/* -------------------------------------------------------------- */}
+              {(overdue.length > 0 || stalled.length > 0 || totals.locked > 0) && (
+                <section className="enter enter-3 mb-4 mt-3.5 overflow-hidden rounded-[var(--radius-lg)] border border-rule bg-rule">
+                  <div className="grid grid-cols-1 gap-[1px] sm:grid-cols-3">
+                    <AlertCell
+                      tone="bad"
+                      icon={<AlertTriangle size={13} />}
+                      count={overdue.length}
+                      label="Repairs overdue"
+                      detail={
+                        overdue.length > 0
+                          ? `Longest ${overdue[0].days}d past deadline`
+                          : "No deadlines breached"
+                      }
+                    />
+                    <AlertCell
+                      tone="warn"
+                      icon={<Timer size={13} />}
+                      count={stalled.length}
+                      label="Files stalled 7d+"
+                      detail={
+                        stalled.length > 0
+                          ? `Longest idle ${stalled[0].days}d at one desk`
+                          : "Everything moving"
+                      }
+                    />
+                    <AlertCell
+                      tone="neutral"
+                      icon={<Lock size={13} />}
+                      count={totals.locked}
+                      label="Locked records"
+                      detail="Letter 3 / Written issued"
+                    />
+                  </div>
+                </section>
+              )}
 
           {/* -------------------------------------------------------------- */}
           {/* Main grid                                                       */}
           {/* -------------------------------------------------------------- */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
             {/* Left — pipeline + attention */}
-            <div className="flex flex-col gap-4 lg:col-span-2">
+            <div className="flex flex-col gap-4 lg:col-span-7">
               <Panel
                 title="Pipeline"
                 icon={<Layers size={17} />}
-                right={<span className="font-mono text-[11px] text-ink-3">by desk</span>}
+                right={<span className="font-mono text-[11px] text-ink-3 tracking-widest uppercase">by desk</span>}
                 delay={0.08}
+                variant="blueprint"
               >
                 <div className="flex flex-col">
-                  {funnelRows.map((row, idx) => {
+                  {funnelRows.map((row) => {
                     const meta = STATUS_META[row.status];
                     const isBottleneck = row.status === bottleneck && row.count > 1;
                     const pct = (row.count / maxCount) * 100;
                     return (
                       <div
                         key={row.status}
-                        className="group relative grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg px-2.5 py-1.5 transition-colors duration-150 hover:bg-surface-2"
+                        className="group relative grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg px-2.5 py-1.5 transition-all duration-300 hover:scale-[0.99] hover:bg-surface-2"
                       >
                         <div className="min-w-0">
                           <div className="mb-1 flex items-center gap-2">
                             <span className="truncate text-[13px] font-medium text-ink">
                               {meta.label}
                             </span>
-                            {isBottleneck && (
-                              <span
-                                className="shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider"
-                                style={{ background: "var(--warn-soft)", color: "var(--warn)" }}
-                              >
-                                Bottleneck
-                              </span>
-                            )}
                           </div>
-                          <div className="h-1 w-full overflow-hidden rounded-full bg-surface-3">
+                          <div className="relative mt-2 h-1.5 w-full overflow-hidden rounded-sm bg-rule">
                             <div
-                              className="h-full rounded-full"
+                              className="h-full rounded-sm"
                               style={{
                                 width: `${pct}%`,
                                 background: toneColor(meta.tone),
-                                transition: "width 0.5s var(--ease-out-quart)",
+                                transition: "width 0.8s cubic-bezier(0.2, 1, 0.2, 1)",
                               }}
                             />
+                            {/* Mechanical grid overlay */}
+                            <div 
+                              className="absolute inset-0" 
+                              style={{ 
+                                backgroundImage: "linear-gradient(90deg, transparent 90%, var(--surface-2) 90%)", 
+                                backgroundSize: "10% 100%" 
+                              }} 
+                            />
                           </div>
-                          <div className="mt-1 font-mono text-[10px] text-ink-3">
-                            {meta.heldBy === "—" ? "Terminal stage" : `Held by ${meta.heldBy}`}
+                          <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-ink-3">
+                            <span>{meta.heldBy === "—" ? "TERMINAL STAGE" : `HELD BY ${meta.heldBy.toUpperCase()}`}</span>
+                            {isBottleneck && (
+                              <span className="flex items-center gap-1 text-warn">
+                                <AlertTriangle size={10} /> BOTTLENECK
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right pl-2">
                           <span
-                            className="font-display text-xl font-bold tnum"
+                            className="font-display text-2xl font-bold tnum"
                             style={{ color: row.count > 0 ? "var(--ink)" : "var(--ink-3)" }}
                           >
                             <CountUp value={row.count} />
@@ -382,7 +416,7 @@ export function AdminDashboard(props: AdminDashboardProps) {
             </div>
 
             {/* Right — money, territories, roster, activity */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 lg:col-span-5">
               <Panel title="Financials" icon={<Wallet size={17} />} delay={0.1}>
                 <dl className="flex flex-col gap-0">
                   <MoneyRow
@@ -422,35 +456,36 @@ export function AdminDashboard(props: AdminDashboardProps) {
                 </dl>
               </Panel>
 
-              {territories.length > 0 && (
-                <Panel title="Territories" icon={<MapPin size={17} />} delay={0.12}>
-                  <div className="flex flex-col gap-2">
-                    {territories.map((t) => {
-                      const max = Math.max(1, ...territories.map((x) => x.count));
-                      return (
-                        <div key={t.name}>
-                          <div className="mb-1 flex items-baseline justify-between gap-2">
-                            <span className="truncate text-[13px] text-ink-2">{t.name}</span>
-                            <span className="shrink-0 font-mono text-xs tnum text-ink">
-                              <CountUp value={t.count} />
-                            </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {territories.length > 0 && (
+                  <Panel title="Territories" icon={<MapPin size={17} />} delay={0.12}>
+                    <div className="flex flex-col gap-2">
+                      {territories.map((t) => {
+                        const max = Math.max(1, ...territories.map((x) => x.count));
+                        return (
+                          <div key={t.name}>
+                            <div className="mb-1 flex items-baseline justify-between gap-2">
+                              <span className="truncate text-[13px] text-ink-2">{t.name}</span>
+                              <span className="shrink-0 font-mono text-xs tnum text-ink">
+                                <CountUp value={t.count} />
+                              </span>
+                            </div>
+                            <div className="h-1 w-full overflow-hidden rounded-full bg-surface-3">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${(t.count / max) * 100}%`,
+                                  background: "var(--accent)",
+                                  transition: "width 0.5s var(--ease-out-quart)",
+                                }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1 w-full overflow-hidden rounded-full bg-surface-3">
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${(t.count / max) * 100}%`,
-                                background: "var(--accent)",
-                                transition: "width 0.5s var(--ease-out-quart)",
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Panel>
-              )}
+                        );
+                      })}
+                    </div>
+                  </Panel>
+                )}
 
               <Panel
                 title="Team"
@@ -476,6 +511,7 @@ export function AdminDashboard(props: AdminDashboardProps) {
                   ))}
                 </div>
               </Panel>
+              </div>
 
               <Panel
                 title="Recent activity"
@@ -487,8 +523,12 @@ export function AdminDashboard(props: AdminDashboardProps) {
               </Panel>
             </div>
           </div>
-
-          {insight}
+          </>
+          ) : (
+            <div style={{ animation: "fadeIn 0.28s var(--ease-standard) both" }}>
+              {insight}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -535,7 +575,7 @@ function AttentionPanel({
         <div className="grid place-items-center gap-2 py-10 text-center">
           <div
             className="grid h-11 w-11 place-items-center rounded-full"
-            style={{ background: "var(--ok-soft)", color: "var(--ok)" }}
+            style={{ background: "var(--ok-soft)", color: "var(--ok-ink)" }}
           >
             <CheckCircle2 size={20} />
           </div>
@@ -545,7 +585,7 @@ function AttentionPanel({
         </div>
       ) : (
         <div className="flex flex-col divide-y divide-rule">
-          {list.map((v, i) => {
+          {list.map((v) => {
             const meta = STATUS_META[v.status];
             return (
               <Link
@@ -596,20 +636,29 @@ function Panel({
   right,
   children,
   delay = 0,
+  variant = "default",
 }: {
   title: string;
   icon?: React.ReactNode;
   right?: React.ReactNode;
   children: React.ReactNode;
   delay?: number;
+  variant?: "default" | "blueprint";
 }) {
+  // The `blueprint` variant used to paint a 16px dot grid behind the panel.
+  // It was texture for its own sake — it carried no information, and behind a
+  // chart it competed with the data. The variant survives as a quieter
+  // ground so callsites keep working; the pattern does not.
+
   return (
     <section
-      className="card p-4 aura-glass transition-all duration-300"
+      className={`rounded-[var(--radius)] border border-rule p-4 ${
+        variant === "blueprint" ? "bg-surface-2" : "bg-surface"
+      }`}
       style={{ animation: `fadeIn 0.28s var(--ease-standard) ${delay}s both` }}
     >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 font-display text-[15px] font-bold text-ink">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-display text-[16px] font-bold text-ink">
           {icon && <span className="text-accent">{icon}</span>}
           {title}
         </h2>
@@ -618,52 +667,6 @@ function Panel({
       {children}
     </section>
   );
-}
-
-/**
- * Metric cell — one panel among six inside the KPI canvas. No border of its
- * own; separation comes from the parent's divide utilities. On hover the cell
- * background lifts to `surface-2` — quiet, purposeful, no decoration.
- */
-function MetricCell({
-  icon,
-  label,
-  renderValue,
-  sub,
-  tone,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  renderValue: React.ReactNode;
-  sub: string;
-  tone: Tone;
-}) {
-  return (
-    <div className="group px-4 py-3.5 transition-colors duration-150 hover:bg-surface-2">
-      <div className="flex items-center gap-1.5">
-        <span
-          className="grid h-5 w-5 shrink-0 place-items-center rounded-md"
-          style={{ background: toneSoft(tone), color: toneColor(tone) }}
-        >
-          {icon}
-        </span>
-        <span className="metric-label truncate">{label}</span>
-      </div>
-      <div
-        className="mt-2 font-display text-[22px] font-bold leading-none tnum text-ink"
-        style={{ letterSpacing: "-0.02em" }}
-      >
-        {renderValue}
-      </div>
-      <div className="metric-sub truncate">{sub}</div>
-    </div>
-  );
-}
-
-/** Compact taka figure that tweens on mount — "Tk 1.24 Cr" style. */
-function AnimatedTaka({ value }: { value: number }) {
-  const v = useCountUp(value, { duration: 560, decimals: 0 });
-  return <span suppressHydrationWarning>{takaCompact(v)}</span>;
 }
 
 /**
@@ -686,7 +689,7 @@ function AlertCell({
 }) {
   const dim = count === 0;
   return (
-    <div className="group flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-2">
+    <div className="group flex items-center gap-3 bg-surface px-4 py-3 transition-colors duration-200 hover:bg-surface-2">
       <span
         className="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
         style={{
@@ -725,15 +728,17 @@ function MoneyRow({
 }) {
   return (
     <div
-      className={`flex items-baseline justify-between gap-3 py-2 ${last ? "" : "border-b border-rule"}`}
+      className={`group relative overflow-hidden rounded-md px-3 py-2.5 transition-colors hover:bg-surface-2 ${last ? "" : "mb-1"}`}
     >
-      <dt className="text-[13px] text-ink-2">{label}</dt>
-      <dd
-        className="font-mono text-[13px] font-semibold tnum"
-        style={{ color: tone === "neutral" ? "var(--ink)" : toneColor(tone) }}
-      >
-        {renderValue}
-      </dd>
+      <div className="relative z-10 flex items-baseline justify-between gap-3">
+        <dt className="text-[13px] font-medium text-ink-2">{label}</dt>
+        <dd
+          className="font-mono text-[13px] font-semibold tnum"
+          style={{ color: tone === "neutral" ? "var(--ink)" : toneColor(tone) }}
+        >
+          {renderValue}
+        </dd>
+      </div>
     </div>
   );
 }
@@ -781,12 +786,12 @@ function GettingStarted() {
       title: "Capture the first vehicle",
       body: "A Recovery Team account starts the pipeline from the field.",
       href: "/register",
-      cta: "View live register",
+      cta: "Open the marketplace",
     },
   ];
 
   return (
-    <section className="card-lg p-7" style={{ animation: "slideUp 0.25s ease 0.05s both" }}>
+    <section className="card-lg p-7" style={{ animation: "slideUp 0.25s var(--ease-out-quart) 0.05s both" }}>
       <div className="flex items-center gap-2.5">
         <span
           className="grid h-9 w-9 place-items-center rounded-xl"
@@ -805,7 +810,7 @@ function GettingStarted() {
           <div
             key={s.n}
             className="flex flex-col rounded-xl border border-rule bg-surface-2 p-4"
-            style={{ animation: `fadeIn 0.25s ease ${0.08 + i * 0.05}s both` }}
+            style={{ animation: `fadeIn 0.25s var(--ease-standard) ${0.08 + i * 0.05}s both` }}
           >
             <span
               className="grid h-6 w-6 place-items-center rounded-full font-mono text-xs"

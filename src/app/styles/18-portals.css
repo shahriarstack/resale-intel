@@ -1,0 +1,979 @@
+/* ===========================================================================
+   PORTALS — the lens, and the studio that composes it
+
+   Two surfaces, one vocabulary:
+
+     .pt-*   the member's workspace at /portal
+     .po-*   the Super Admin's studio at /admin/portals
+
+   Both take their colour from three custom properties set inline by the
+   component — `--pt-fill`, `--pt-ink`, `--pt-soft` — which resolve to tokens
+   already in the ramp (see ACCENT_META in lib/portals.ts). Nothing here
+   introduces a colour of its own: a portal's accent is a way of telling two
+   portals apart at a glance, not a new palette.
+
+   The member's surface is deliberately plainer than any desk. A portal is read
+   by someone who does not work here and will not learn eight layouts, so every
+   panel is the same object — a titled card with the question it answers under
+   the title — repeated.
+   ======================================================================== */
+
+@layer components {
+  /* ======================================================================
+     THE MEMBER'S WORKSPACE
+     ==================================================================== */
+
+  .pt-page {
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
+    /* `w-full` above and a side padding set once here. Both shells wrap the
+       page in a column flex main, where auto margins disable the stretch —
+       see the layout traps section in the README. */
+    padding: 26px 24px 40px;
+  }
+
+  /* ---- Previewing somebody else's lens ---- */
+  .pt-preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 16px;
+    padding: 9px 14px;
+    border-radius: var(--radius-lg);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: 12.5px;
+  }
+  .pt-preview-back {
+    margin-left: auto;
+    font-weight: 600;
+    text-decoration: underline;
+    white-space: nowrap;
+  }
+
+  /* ---- Header ---- */
+  .pt-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--rule);
+  }
+  /* The key. Same object in the member's header and on the studio's cards, so
+     a portal is recognisable from the list before it is opened. */
+  .pt-key,
+  .po-key {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    color: var(--on-accent);
+    background: var(--pt-fill);
+    box-shadow: var(--shadow-sm);
+  }
+  .pt-sentence {
+    margin-top: 5px;
+    max-width: 68ch;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+  .pt-scope {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex: none;
+  }
+  .pt-scope-n {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--pt-ink);
+  }
+  .pt-scope-label {
+    margin-top: 2px;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* ---- The terms of the lens ----
+     Stated on the page the reader is using. Someone who knows a figure is
+     withheld asks for it; someone who thinks it is zero does not. */
+  .pt-terms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 14px 0 20px;
+  }
+  .pt-term {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    background: var(--surface-2);
+  }
+  .pt-term-on {
+    color: var(--pt-ink);
+    background: var(--pt-soft);
+  }
+  /* Masked lenses are struck through rather than dimmed. A dimmed chip reads
+     as "not important"; a struck one reads as "deliberately not here". */
+  .pt-term-off {
+    color: var(--ink-3);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
+  /* ---- Panels ---- */
+  .pt-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .pt-panel {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
+    overflow: hidden;
+  }
+  .pt-panel-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .pt-panel-glyph {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    color: var(--pt-ink);
+    background: var(--pt-soft);
+  }
+  .pt-panel-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .pt-panel-question {
+    margin-top: 1px;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  .pt-inert,
+  .pt-empty,
+  .pt-more {
+    padding: 14px 16px;
+    font-size: 12.5px;
+    color: var(--ink-3);
+  }
+  .pt-inert {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    color: var(--warn-ink);
+    background: var(--warn-soft);
+  }
+  .pt-more {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* ---- Tables ----
+     The scroller carries `min-w-0` semantics via `min-width: 0`: without it an
+     overflow container reports its content's min-content as its own minimum
+     and widens the page instead of scrolling. Third of the three layout traps
+     in the README. */
+  .pt-scroll {
+    min-width: 0;
+    overflow-x: auto;
+  }
+  .pt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  .pt-table th {
+    padding: 8px 14px;
+    text-align: left;
+    white-space: nowrap;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    background: var(--surface-2);
+  }
+  .pt-table td {
+    padding: 9px 14px;
+    border-top: 1px solid var(--rule);
+    color: var(--ink);
+    vertical-align: middle;
+  }
+  .pt-table th.num,
+  .pt-table td.num {
+    text-align: right;
+    /* A figure that wraps stops being a column anyone can scan down, and the
+       scroller above already handles a table too wide for the panel. */
+    white-space: nowrap;
+  }
+  /* Same argument for a masked name: it carries no information worth a second
+     line, and wrapping it makes the row taller than the ones around it. */
+  .pt-table td .pt-mask,
+  .pt-table td.pt-mask {
+    white-space: nowrap;
+  }
+  .pt-table .mono {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+  .pt-table .muted {
+    color: var(--ink-3);
+  }
+  .pt-table td[data-neg="true"] {
+    color: var(--bad-ink);
+  }
+
+  /* A masked value. Not hidden and not empty — the column stays so the reader
+     can see that a figure exists and is not theirs, which a removed column
+     cannot say. */
+  .pt-mask {
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    color: var(--ink-3);
+  }
+
+  /* ---- Bars ---- */
+  .pt-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 14px 16px;
+  }
+  .pt-bar-row {
+    display: grid;
+    grid-template-columns: minmax(96px, 168px) 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+  }
+  .pt-bar-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-2);
+  }
+  .pt-bar-track {
+    min-width: 0;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--surface-3);
+    overflow: hidden;
+  }
+  .pt-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--pt-fill);
+  }
+  .pt-bar-n {
+    min-width: 2.5ch;
+    text-align: right;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .pt-bar-value {
+    min-width: 8ch;
+    text-align: right;
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+
+  /* ---- Figures ---- */
+  .pt-figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .pt-figure {
+    flex: 1 1 140px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+  }
+  .pt-figure-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .pt-figure-value {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .pt-figure-sub {
+    display: block;
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+  .pt-figure[data-tone="ok"] .pt-figure-value {
+    color: var(--ok-ink);
+  }
+  .pt-figure[data-tone="bad"] .pt-figure-value {
+    color: var(--bad-ink);
+  }
+
+  /* ---- Feed ---- */
+  .pt-feed {
+    padding: 6px 16px 14px;
+  }
+  .pt-feed-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 12.5px;
+  }
+  .pt-feed-row:last-child {
+    border-bottom: 0;
+  }
+  .pt-feed-when {
+    flex: none;
+    min-width: 88px;
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+  .pt-feed-what {
+    min-width: 0;
+    color: var(--ink-2);
+  }
+  .pt-feed-what .mono {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--ink);
+  }
+  .pt-feed-what .muted {
+    color: var(--ink-3);
+  }
+
+  /* ---- Nothing to render ---- */
+  .pt-denied {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    margin-top: 40px;
+    padding: 18px 20px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+  }
+  .pt-denied-plate {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    color: var(--ink-2);
+    background: var(--surface-3);
+  }
+  .pt-denied-title {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .pt-denied-body {
+    margin-top: 4px;
+    max-width: 58ch;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+
+  /* ======================================================================
+     THE STUDIO
+     ==================================================================== */
+
+  .po-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+    gap: 14px;
+  }
+
+  .po-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
+  }
+  /* Suspended is a state of the portal, not a fault, so it desaturates rather
+     than turning red — the same argument the capture-windows console makes for
+     never painting an authorised exception with --bad. */
+  .po-card[data-off="true"] {
+    background: var(--surface-2);
+  }
+  .po-card[data-off="true"] .po-key {
+    filter: grayscale(1);
+    opacity: 0.55;
+  }
+  .po-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .po-card-name {
+    font-family: var(--font-display);
+    font-size: 16.5px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .po-card-desc {
+    margin-top: 3px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .po-off {
+    flex: none;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    background: var(--surface-3);
+  }
+
+  .po-facets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .po-facet {
+    display: flex;
+    flex-direction: column;
+  }
+  .po-facet-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .po-facet-value {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .po-card-panels,
+  .po-mirror-panels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .po-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--pt-ink);
+    background: var(--pt-soft);
+  }
+
+  .po-card-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 11px;
+    border-top: 1px solid var(--rule);
+  }
+  .po-members {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .po-members .muted {
+    color: var(--ink-3);
+  }
+
+  /* ---- Nothing composed yet ---- */
+  .po-blank {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 18px 20px;
+    border-radius: var(--radius-lg);
+    background: var(--ok-soft);
+    box-shadow: inset 0 0 0 1px var(--ok-line);
+  }
+  .po-blank-plate {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    color: var(--ok-ink);
+    background: color-mix(in srgb, var(--ok) 16%, transparent);
+  }
+  .po-blank-title {
+    font-family: var(--font-display);
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--ok-ink);
+  }
+  .po-blank-note {
+    margin-top: 3px;
+    max-width: 62ch;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ok-ink);
+  }
+
+  /* ---- Composer / mirror ----
+     The mirror sticks because the composer is taller than a screen and the
+     whole point of the mirror is that it answers a toggle you just pressed. */
+  .po-studio {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  @media (min-width: 1024px) {
+    .po-studio {
+      grid-template-columns: minmax(0, 1fr) 340px;
+      align-items: start;
+    }
+    .po-mirror {
+      position: sticky;
+      top: 20px;
+    }
+  }
+
+  .po-compose {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .po-block {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
+    overflow: hidden;
+  }
+  .po-block-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+  .po-step {
+    display: grid;
+    place-items: center;
+    flex: none;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 7px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--on-accent);
+    background: var(--accent);
+  }
+  .po-block-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .po-block-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .po-field {
+    min-width: 0;
+  }
+  .po-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .po-hint {
+    margin-top: 6px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  /* ---- Mark ---- */
+  .po-marks,
+  .po-glyphs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .po-glyphs {
+    margin-top: 9px;
+  }
+  .po-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 9px;
+    box-shadow: 0 0 0 1px rgba(14, 17, 22, 0.08);
+    transition: transform 0.12s var(--ease-spring);
+  }
+  .po-swatch[data-on="true"] {
+    transform: scale(1.12);
+    box-shadow:
+      0 0 0 2px var(--surface),
+      0 0 0 4px var(--ink);
+  }
+  .po-glyph {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    color: var(--ink-3);
+    background: var(--surface-2);
+  }
+  .po-glyph[data-on="true"] {
+    color: var(--on-accent);
+    background: var(--ink);
+  }
+
+  /* ---- Band ---- */
+  .po-bands {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .po-band {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 13px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    text-align: left;
+  }
+  .po-band[data-on="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .po-band-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .po-band-note {
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+  }
+
+  /* ---- Chips ---- */
+  .po-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .po-chip {
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    background: var(--surface);
+  }
+  .po-chip[data-on="true"] {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+  }
+
+  /* ---- Modules and lenses ----
+     One row shape for both: glyph, name, the question or the consequence, and
+     a tick. They are different decisions and they are made the same way. */
+  .po-modules,
+  .po-lenses {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .po-module,
+  .po-lens {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    text-align: left;
+  }
+  .po-module[data-on="true"],
+  .po-lens[data-on="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  /* Granted but empty under this scope. Ochre, not red: the admin has not made
+     a mistake, they have composed something that will render nothing, and the
+     row says so without treating it as an error. */
+  .po-module[data-inert="true"] {
+    border-color: var(--warn-line);
+    background: var(--warn-soft);
+  }
+  .po-module-glyph,
+  .po-lens-glyph {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    color: var(--ink-3);
+    background: var(--surface-2);
+  }
+  .po-module[data-on="true"] .po-module-glyph,
+  .po-lens[data-on="true"] .po-lens-glyph {
+    color: var(--on-accent);
+    background: var(--accent);
+  }
+  .po-module[data-inert="true"] .po-module-glyph {
+    color: var(--on-accent);
+    background: var(--warn);
+  }
+  .po-module-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .po-module-q {
+    display: block;
+    margin-top: 1px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+  }
+  .po-module-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    margin-top: 5px;
+    font-size: 11px;
+    line-height: 1.4;
+    font-weight: 600;
+    color: var(--warn-ink);
+  }
+  .po-tick {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 6px;
+    color: var(--on-accent);
+    background: transparent;
+  }
+  .po-module[data-on="true"] .po-tick,
+  .po-lens[data-on="true"] .po-tick {
+    background: var(--accent);
+  }
+  .po-module[data-inert="true"] .po-tick {
+    background: var(--warn);
+  }
+
+  /* ---- The mirror ---- */
+  .po-mirror {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .po-mirror-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .po-mirror-card {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 12px;
+    border-radius: var(--radius);
+    background: var(--pt-soft);
+  }
+  .po-mirror-name {
+    font-family: var(--font-display);
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--pt-ink);
+  }
+  .po-mirror-band {
+    font-size: 11.5px;
+    color: var(--pt-ink);
+    opacity: 0.8;
+  }
+  .po-mirror-sentence {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+  .po-mirror-none {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--warn-ink);
+  }
+  .po-mirror-inert {
+    width: 100%;
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--warn-ink);
+  }
+
+  /* ---- The sample record ----
+     The reason the mirror is a mirror and not a summary: this is the mask
+     itself, not a sentence describing one. */
+  .po-sample {
+    padding: 12px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+  }
+  .po-sample-label {
+    margin-bottom: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .po-sample-rows {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 12px;
+    align-items: baseline;
+  }
+  .po-sample-k {
+    font-size: 11px;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .po-sample-v {
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .po-sample-v.mono {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .po-sample-v[data-masked="true"] {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--ink-3);
+  }
+  .po-mirror-foot {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  /* ---- Narrow ---- */
+  @media (max-width: 640px) {
+    .pt-page {
+      padding: 18px 16px 32px;
+    }
+    .pt-head {
+      flex-wrap: wrap;
+    }
+    .pt-scope {
+      align-items: flex-start;
+    }
+    .pt-bar-row {
+      grid-template-columns: minmax(84px, 1fr) 1.2fr auto;
+    }
+    /* The territory value is the first thing to go: the name and the count
+       are the reading, and the money is a detail that can be read on the
+       register panel instead. */
+    .pt-bar-value {
+      display: none;
+    }
+  }
+}

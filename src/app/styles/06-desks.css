@@ -1,0 +1,1662 @@
+/* ==========================================================================
+   PRECISION
+   Single-theme finishing pass. Nothing here changes layout or colour family;
+   it is the set of details that separate a competent interface from one that
+   looks drawn on purpose.
+   ========================================================================== */
+
+@layer base {
+  /* ---- Optical tracking ----
+     Letter-spacing is not one value. As type grows, the gaps between letters
+     grow with it and must be pulled back; as type shrinks (and especially in
+     small caps), they close up and must be opened out. A single global
+     tracking value is the most common typographic tell in software.
+     The scale below is applied by size, not by element, so any component
+     using a size inherits the right optical correction. */
+  /* Applied to the display elements that actually exist rather than to a
+     speculative utility scale. Tailwind purges @layer classes nothing
+     references, so an unused scale ships as nothing at all. */
+  .page-title {
+    letter-spacing: -0.024em;
+    line-height: 1.06;
+  }
+  .metric-value,
+  .stat-tile .font-display {
+    letter-spacing: -0.032em;
+  }
+  /* The one true display-scale headline in the product. */
+  .login-headline {
+    letter-spacing: -0.032em;
+    line-height: 1.06;
+  }
+
+  /* The two words that name what the platform covers, painted with the same
+     blue → purple → green ramp as the wordmark above them — so the headline
+     reads as part of the mark rather than as a large sentence.
+
+     `background-clip: text` needs a transparent fill, and the plain colour
+     underneath is what shows if a browser cannot do the clip. */
+  .login-headline-mark {
+    background-image: linear-gradient(
+      100deg,
+      var(--brand-blue),
+      var(--brand-purple) 48%,
+      var(--brand-green)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: var(--brand-blue);
+  }
+  /* ---- Numerals ----
+     A pipeline app is mostly numbers. Three features matter and none are on
+     by default:
+       tnum  every digit the same width, so columns of money align and a
+             changing figure does not shuffle its neighbours sideways
+       zero  slashed zero, so 0 and O are never confused in a registration
+             number or a staff ID
+       ss01  IBM Plex's alternate shapes, which sit better at small sizes */
+  .tnum,
+  .font-mono,
+  input[type="number"],
+  .metric-value,
+  .stat-tile,
+  td {
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+  .font-mono {
+    font-feature-settings: "zero" 1, "ss01" 1;
+  }
+
+  /* Headings break where a reader would break them, not where the box ends. */
+  h1, h2, h3, .page-title {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+
+  /* ---- Selection ----
+     The default browser selection is a saturated system blue that has nothing
+     to do with this palette and appears every time someone drags across a
+     registration number. */
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--ink);
+  }
+}
+
+@layer components {
+  /* ---- Focus ----
+     One ring, drawn outside the control, following the control's own radius.
+     The default `outline` squares off rounded controls, which looks like a
+     rendering bug rather than a focus state. */
+  :where(a, button, [role="button"], input, select, textarea, summary):focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow:
+      0 0 0 2px var(--surface),
+      0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent);
+    border-radius: inherit;
+  }
+
+  /* ---- Hairlines ----
+     On a 2x display a 1px CSS border renders as 2 device pixels and reads
+     heavier than intended. Where a divider is purely structural, drop it to a
+     true hairline so the grid reads as drafting, not as boxes. */
+  @media (min-resolution: 2dppx) {
+    .dtable tbody td,
+    .dtable thead th {
+      border-bottom-width: 0.5px;
+    }
+  }
+
+  /* ---- Eyebrows ----
+     Kept, because in a dense app they are functional labels rather than
+     decoration, but pulled back: smaller, wider, and lighter than the
+     headline they sit above, so they read as a caption and never compete. */
+  .eyebrow {
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+
+  /* ---- Card interiors ----
+     A card's inner radius must be smaller than its outer radius by roughly
+     the padding between them, or the two curves fight. */
+  .card > :first-child:is(img, .card-media),
+  .card-media {
+    border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
+  }
+
+
+  /* ---- Empty-value glyph ----
+     The em-dash standing for "no value" should recede, not read as content. */
+  .dtable td:has(> :only-child):empty::after {
+    content: "—";
+    color: var(--ink-3);
+  }
+}
+
+@layer components {
+  /* ---- Repair stage button ----
+     A one-tap report control. Sized for a thumb (32px tall, generous
+     horizontal padding) because it is used in a workshop on a phone, not at a
+     desk with a mouse. Tone comes from the stage's own meaning so "Awaiting
+     parts" reads as a blocker at a glance without needing to be read. */
+  /* The stage picker's track.
+     Four pills on one line rather than two wrapped rows. On a narrow card the
+     last of them — READY, which is the one that finishes the job — can sit off
+     the right edge, so the track fades out there instead of cutting a pill in
+     half: a clipped shape reads as a rendering fault, a fade reads as "there is
+     more this way". The padding-right leaves the last pill clear of the fade
+     once it has been scrolled to. */
+  .stage-rail {
+    display: flex;
+    gap: 5px;
+    padding: 2px 14px 2px 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  }
+  /* Nothing hidden, nothing to hint at. `scroll-width` is not queryable in
+     CSS, so this leans on the pills fitting: when they do, the track is not a
+     scroller and the mask would only dim a live control for no reason. */
+  @supports (animation-timeline: scroll()) {
+    .stage-rail {
+      animation: stage-rail-unmask;
+      animation-timeline: scroll(self inline);
+      animation-fill-mode: both;
+    }
+  }
+  @keyframes stage-rail-unmask {
+    to {
+      -webkit-mask-image: linear-gradient(to right, #000 100%, #000);
+      mask-image: linear-gradient(to right, #000 100%, #000);
+    }
+  }
+
+  .stage-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+    padding: 0 9px;
+    flex: none;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 0.16s var(--ease-standard),
+      border-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard),
+      transform 0.12s var(--ease-standard);
+  }
+  .stage-btn:hover:not(:disabled) {
+    border-color: var(--rule-strong);
+    color: var(--ink);
+  }
+  .stage-btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .stage-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  /* The selected stage carries its tone as a filled pill. */
+  .stage-btn[data-on="true"][data-tone="accent"] {
+    background: var(--accent-soft);
+    border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+    color: var(--accent-ink);
+  }
+  .stage-btn[data-on="true"][data-tone="warn"] {
+    background: var(--warn-soft);
+    border-color: color-mix(in srgb, var(--warn) 42%, transparent);
+    color: var(--warn-ink);
+  }
+  .stage-btn[data-on="true"][data-tone="ok"] {
+    background: var(--ok-soft);
+    border-color: color-mix(in srgb, var(--ok) 42%, transparent);
+    color: var(--ok-ink);
+  }
+  .stage-btn[data-on="true"][data-tone="neutral"] {
+    background: var(--surface-3);
+    border-color: var(--rule-strong);
+    color: var(--ink-2);
+  }
+
+  /* ---- A stage the job has already passed ----
+     SHOWN, NOT HIDDEN. The rail is a record of the route as much as it is a
+     control, and a stage that vanishes once passed leaves an engineer
+     wondering whether they ever filed it. So it stays in place, set back, with
+     a padlock where the tick would be.
+
+     Deliberately quieter than `:disabled` alone: a disabled control that looks
+     merely dimmed reads as "not ready yet", which is the opposite of what this
+     one means. The strike is what says PASSED rather than UNAVAILABLE — this
+     report has been made and cannot be made again. */
+  .stage-btn[data-locked="true"] {
+    opacity: 1;
+    border-color: transparent;
+    background: transparent;
+    color: var(--ink-3);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--ink-3) 55%, transparent);
+    text-decoration-thickness: 1px;
+  }
+  .stage-btn[data-locked="true"] svg {
+    opacity: 0.7;
+  }
+
+  /* ---- The confirmation's two ends ----
+     The dialog confirms a MOVE, not a destination, so it draws both: where the
+     job is, and where it is going. An engineer who mis-tapped notices by
+     seeing the stage they are about to leave. */
+  .stage-confirm-move {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 11px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    font-size: 13px;
+  }
+  .stage-confirm-from {
+    color: var(--ink-3);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--ink-3) 50%, transparent);
+  }
+  .stage-confirm-to {
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  /* ---- Why it stopped ----
+     Two cards, not a radio pair. The choice is being made one-handed next to a
+     vehicle, so each option is a whole tap target carrying its own sentence —
+     a radio dot with a label beside it asks the same question in a quarter of
+     the area and gets the wrong answer more often. */
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .why-opt {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color 0.16s var(--ease-standard),
+      background-color 0.16s var(--ease-standard);
+  }
+  .why-opt:hover {
+    border-color: var(--rule-strong);
+  }
+  .why-opt[data-on="true"] {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    background: var(--accent-soft);
+  }
+  .why-opt-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .why-opt[data-on="true"] .why-opt-label {
+    color: var(--accent-ink);
+  }
+  .why-opt-blurb {
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--ink-3);
+  }
+}
+
+/* ==========================================================================
+   ATTENTION LINE
+   One row that says what needs the engineer, with each count a jump to where
+   that item lives. Replaces a stack of advisory cards that pushed the actual
+   work below the fold.
+   ========================================================================== */
+
+@layer components {
+  /* ---- The panel ----
+     Violet, and deliberately not the warn ochre it used to be.
+     The chips inside already carry the urgency — garnet for a passed
+     deadline, ochre for parts, grey for work merely in progress — and an
+     ochre container behind them was a second, cruder statement of the same
+     thing that drowned the first. A violet ground says "this block is
+     addressed to you" and leaves the colour that means "late" to the one
+     element that knows whether anything is.
+
+     Light, not dark. The hero directly above is already a deep indigo slab;
+     a second one here would give the panel two competing weights in the first
+     200px and flatten the hierarchy the hero exists to set. This is the same
+     hue at the other end of the ramp — related, subordinate, still premium. */
+  /* The specular hairline. Brightest at the left third, which is where the
+     bell sits — the same trick the product's glass chrome uses, so the panel
+     belongs to the same material family rather than being a new one. */
+
+  /* The notification panel that used to live here — a bell, a bloom, a dot
+     field and a scrolling rail of tinted count chips — is gone. The engineer's
+     bench now uses the officer's inset-grouped attention list, which says what
+     to DO about each count rather than only how many there are, so the rail
+     and everything drawn around it went with it. See the ARO panel notes in
+     the README. */
+
+  /* The figure is the content of a tile, so it takes the panel-figure step
+     of the type scale. It used to be hardcoded at 25px here, overriding
+     whatever the component asked for — which is exactly the kind of drift a
+     scale exists to stop. */
+  .stat-tile .font-display {
+    font-size: var(--t-xl);
+  }
+  @media (max-width: 420px) {
+    .stat-tile {
+      padding: 8px 10px 9px;
+    }
+  }
+}
+
+/* ==========================================================================
+   BENCH TILES (Service Engineer panel)
+   A bigger, colour-coded 2x2 metric grid built for a phone held one-handed.
+
+   On the multi-hue: earlier in this redesign the decorative tile tints were
+   collapsed to one accent, because arbitrary colour is the classic tell. This
+   is not that. Each hue is bound to a bucket, and the bucket tabs below
+   already carry the same tone, so the colour is a consistent index into the
+   work rather than decoration. Change a bucket's hue here and its tab follows.
+   ========================================================================== */
+
+@layer base {
+  :root {
+    --cat-assess: #3d6ff2;
+    --cat-assess-soft: #e7eefd;
+    --cat-review: #d98f1c;
+    --cat-review-soft: #fdf1dc;
+    --cat-repair: #17a06b;
+    --cat-repair-soft: #e0f5ec;
+    --cat-bench: #7b5cf0;
+    --cat-bench-soft: #eee9fd;
+    --cat-cleared: #6b7a90;
+    --cat-cleared-soft: #eceff3;
+  }
+}
+
+@layer components {
+  /* ---- The bench rail ----
+     One segmented track carrying all five buckets. It replaced a 2x2 grid of
+     metric tiles that sat above a row of tab pills doing the identical job —
+     see the note at its call site in EngineerWorkbench.
+
+     A track rather than five loose pills, because these are not five choices:
+     they are one dial with five positions, and a recessed groove with a raised
+     selected segment says that in a way a row of separated shapes cannot. The
+     shape is borrowed from the density switch the desk consoles already use,
+     so the engineer meets a control they have seen elsewhere in the product.
+
+     The figure is the point. It takes its bucket's colour while there is work
+     in that bucket and greys out when there is none, so the rail reads as a
+     gauge at a glance and only resolves into navigation once you reach for it. */
+
+  /* ---- The thumb ----
+     One element that travels, rather than five that switch on and off. It sits
+     under the segments (z-index -1 against the rail's isolation) so the labels
+     never fade through it, and it carries a wash of the ACTIVE bucket's own
+     colour — so the switch does not merely move, it changes temperature as it
+     goes from the blue of "assess" to the green of "repair".
+
+     Positioned by two custom properties the nav sets from React: `--seg-count`
+     never changes and `--seg-index` is the only thing that does, which keeps
+     the animation a single transform and nothing else. */
+
+  /* Equal segments, because the thumb's travel is a multiple of one segment
+     width. `flex: 1 1 0` rather than `1 0 auto`: the latter sizes to content,
+     which made "Cleared" wider than "Month" and put the thumb a few pixels out
+     by the end of the rail. */
+  /* The glyph. Grey until its bucket has work, exactly like the figure below
+     it — so an empty bucket is quiet in both marks rather than half-lit. */
+
+  /* Colour means "there is work here", not "this tab is selected" — an empty
+     bucket stays grey even while you are standing in it, which is the honest
+     reading and the one that lets the row be scanned without tapping. */
+  /* `--cat` resolves per segment, not per rail: the nav sets it to the ACTIVE
+     bucket's tone for the thumb, and each segment's own inline style shadows
+     that for itself and its children. So the thumb is one colour while every
+     figure keeps its own. */
+  /* The selected figure lifts a little. The only scale change on the panel,
+     and it is what makes the thumb feel like it picked something up rather
+     than slid underneath it. */
+
+  /* Reduced motion: the thumb still moves, because its POSITION is the state
+     and freezing it would leave the control lying about which bucket is open.
+     What goes is the travel and the bounce — it changes place without
+     performing the journey. */
+  @media (prefers-reduced-motion: reduce) {
+  }
+
+  /* ---- Filled tab ----
+     The active bucket becomes a solid accent pill. At a glance across a
+     scrolling row of four, a filled shape reads faster than a tinted outline. */
+  .tone-tab[data-on="true"] {
+    background: var(--tab-tone, var(--accent));
+    border-color: var(--tab-tone, var(--accent));
+    color: #fff;
+    box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--tab-tone, var(--accent)) 55%, transparent);
+  }
+  .tone-tab[data-on="true"] .tone-tab-count {
+    background: rgba(255, 255, 255, 0.24);
+    color: #fff;
+  }
+  .tone-tab {
+    min-height: 38px;
+    padding: 0 13px;
+    font-size: 13px;
+    gap: 7px;
+  }
+  .tone-tab-count {
+    min-width: 20px;
+    height: 20px;
+    font-size: 10.5px;
+  }
+
+  /* The attention row's own sizing was here as a later override — a 38px warn
+     circle and a wider chip. Both are folded into the panel's definition
+     above now, because two places setting the same bell was how it ended up
+     ochre in one and violet in the other. */
+}
+
+@layer components {
+  /* ---- Bench hero ----
+     Taller than the desk heroes, because on the engineer's phone this panel
+     is the whole application rather than one page inside a sidebar.
+
+     Deep colour now, where it used to be a white surface. The bench and the
+     recovery book are the only two surfaces in the product that ARE the
+     application on a phone rather than one page inside a sidebar, and they
+     should open the same way — so this card takes the recovery summary's
+     material: a deep diagonal ramp, rounded hard, white type, dot veil.
+
+     The ramp is the bench's own sentence though. It starts in the deep blue
+     this desk is framed in everywhere else and lands on the bench violet,
+     where the recovery card runs out through teal to green. Same material,
+     different hue — which is the whole point of giving two field surfaces
+     one design language instead of one skin.
+
+     And it is flat: the recovery card's gradient drifts, this one holds
+     still. Two animated colour fields in one product is one more than the
+     idea carries, and the drift belongs to the surface that had it first. */
+
+  /* The bench hero's own material — a held violet ramp, a dot veil, a capsule
+     eyebrow and a cyan name — is gone too. The bench is headed by `.aro-slab`
+     now, the same lit surface as the officer's summary block, which is what
+     "one design language across the two field surfaces" was always trying to
+     say and had been saying with two separate implementations of it. */
+
+}
+
+/* ==========================================================================
+   INSIGHT SURFACES
+   The analytics layer that sits under each desk queue.
+
+   Density is the whole point. These panels report on work the user is already
+   looking at, so they must never out-weigh the queue above them: padding is
+   11-13px, the tallest figure is 21px, and nothing here is a "hero" card.
+   Where the desk tables use a solid surface for legibility, these use a light
+   aura-glass — they carry short numeric labels rather than prose, so a tinted
+   translucent ground costs nothing and ties the block to the page's ambient
+   light instead of stamping eight white rectangles onto it.
+   ========================================================================== */
+
+@layer components {
+  /* Tone plumbing. Every insight primitive reads --tone-* rather than naming
+     a semantic colour itself, so a single `data-tone` on the wrapper re-skins
+     the bar, the dot, the figure and the rail together. */
+  [data-tone="accent"] {
+    --tone: var(--accent);
+    --tone-soft: var(--accent-soft);
+    --tone-ink: var(--accent-ink);
+  }
+  [data-tone="ok"] {
+    --tone: var(--ok);
+    --tone-soft: var(--ok-soft);
+    --tone-ink: var(--ok);
+  }
+  [data-tone="warn"] {
+    --tone: var(--warn);
+    --tone-soft: var(--warn-soft);
+    --tone-ink: var(--warn);
+  }
+  [data-tone="bad"] {
+    --tone: var(--bad);
+    --tone-soft: var(--bad-soft);
+    --tone-ink: var(--bad);
+  }
+  [data-tone="neutral"] {
+    --tone: var(--ink-3);
+    --tone-soft: var(--surface-2);
+    --tone-ink: var(--ink-2);
+  }
+
+  /* ---- Panel ----
+     Aura-glass at low strength: enough refraction to sit in the page's light,
+     not so much that a four-digit figure loses its edges. */
+  .insight-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    padding: 11px 12px 12px;
+    background: var(--surface);
+    transition: border-color 0.2s var(--ease-standard);
+  }
+
+  .insight-panel:hover {
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -1px 0 rgba(28, 24, 68, 0.05),
+      var(--shadow-sm);
+  }
+
+  /* Specular travel along the top bevel — brightest left of centre so the
+     whole insight block agrees with the one light source used elsewhere. */
+  .insight-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.98) 20%,
+      rgba(255, 255, 255, 0.45) 52%,
+      transparent 82%
+    );
+    pointer-events: none;
+  }
+
+  .insight-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .insight-head svg {
+    color: var(--tone, var(--accent));
+  }
+
+  /* ---- Reading ----
+     One number with its meaning. Deliberately not a card: no border, no
+     shadow. Four of these in a row read as one instrument panel rather than
+     four competing tiles.
+
+     The tone used to be a left rail. It is now the label itself — a nine-pixel
+     mono caption in the tone says the same thing in the same place, without
+     adding a fifth left border to a product that had them on four different
+     kinds of surface. */
+  .reading {
+    position: relative;
+    padding: 2px 0;
+  }
+  .reading-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--tone-ink, var(--ink-3));
+  }
+  .reading-value {
+    margin-top: 3px;
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .reading-unit {
+    margin-left: 1px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--tone-ink, var(--ink-3));
+  }
+  .reading-caption {
+    margin-top: 3px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    line-height: 1.35;
+    color: var(--ink-3);
+  }
+  /* No data yet. Says so, rather than showing a confident zero. */
+  .reading-empty {
+    margin-top: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+
+  /* ---- Bar list ---- */
+  .bar-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 3.5px 0;
+  }
+  /* With a secondary readout the row becomes label | meta | count, so the two
+     figures are separated by a full gap and a weight change rather than by
+     6px of margin. */
+  .bar-row[data-meta] {
+    grid-template-columns: 1fr auto auto;
+  }
+  .bar-meta {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    color: var(--ink-3);
+    padding-right: 7px;
+    border-right: 1px solid color-mix(in srgb, var(--ink-3) 22%, transparent);
+  }
+  .bar-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  .bar-dot {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--tone, var(--accent));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tone, var(--accent)) 18%, transparent);
+  }
+  .bar-value {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .bar-track {
+    grid-column: 1 / -1;
+    margin-top: 1px;
+    height: 4px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--ink-3) 12%, transparent);
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--tone, var(--accent)) 72%, #fff),
+      var(--tone, var(--accent))
+    );
+    transform-origin: left center;
+    animation: barGrow 0.55s var(--ease-out-quart) both;
+  }
+  @keyframes barGrow {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  /* ---- Stacked proportion bar ---- */
+  .stack-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--ink-3) 10%, transparent);
+    box-shadow: inset 0 1px 2px rgba(28, 24, 68, 0.07);
+  }
+  .stack-seg {
+    height: 100%;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tone, var(--accent)) 78%, #fff),
+      var(--tone, var(--accent))
+    );
+    border-right: 1px solid rgba(255, 255, 255, 0.55);
+    transition: filter 0.2s var(--ease-standard);
+  }
+  .stack-seg:last-child {
+    border-right: 0;
+  }
+  .stack-bar:hover .stack-seg {
+    filter: saturate(1.15);
+  }
+
+  /* ---- Rank pill (leaderboards) ---- */
+  .rank-pill {
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    border-radius: 5px;
+    background: var(--tone-soft, var(--surface-2));
+    color: var(--tone-ink, var(--ink-2));
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Empty state inside a panel ---- */
+  .insight-empty {
+    padding: 10px 0 4px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+
+  /* ---- Divider between stacked readouts in one panel ---- */
+  .insight-rule {
+    height: 1px;
+    margin: 9px 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--ink-3) 22%, transparent) 12%,
+      color-mix(in srgb, var(--ink-3) 22%, transparent) 88%,
+      transparent
+    );
+  }
+
+  /* ---- Sparkline / column plot shell ---- */
+  .plot-col {
+    border-radius: 2px 2px 0 0;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tone, var(--accent)) 70%, #fff),
+      var(--tone, var(--accent))
+    );
+    transition: filter 0.18s var(--ease-standard);
+  }
+  .plot-col[data-empty="true"] {
+    background: color-mix(in srgb, var(--ink-3) 16%, transparent);
+  }
+}
+
+/* Glass is a luxury the low-end field phones should not pay for, and a
+   backdrop-filter across eight panels is the most expensive thing on the page.
+   Where the browser cannot composite it, the panels fall back to a solid
+   tinted surface that still looks deliberate rather than broken. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   COVERAGE TABLE
+   Territory summary — the widest table in the app, and the only one that
+   scrolls sideways.
+
+   Two things make a table this wide readable: the identity column has to stay
+   put while the numbers scroll under it, and the numeric grid has to be quiet
+   enough that a tinted cell reads as a signal rather than as decoration.
+   ========================================================================== */
+
+@layer components {
+  .coverage-table {
+    /* Fixed would collapse the numeric columns to equal widths regardless of
+       heading length; auto lets "CN pending" keep its header while a column
+       of single digits stays narrow. */
+    table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .coverage-table th,
+  .coverage-table td {
+    white-space: nowrap;
+  }
+
+  /* Numeric columns: tabular figures and right alignment, so the eye can scan
+     a column without the digits dancing. */
+  .coverage-table th.num,
+  .coverage-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .coverage-table th.num {
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+  }
+
+  /* The territory name stays visible while the numbers scroll beneath it. */
+  .coverage-sticky {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--surface);
+    /* A hairline rather than a shadow: a shadow under a sticky column reads as
+       a seam when the table is not actually scrolled. */
+    box-shadow: 1px 0 0 var(--rule);
+  }
+  thead .coverage-sticky {
+    z-index: 3;
+    background: var(--surface-2);
+  }
+  tfoot .coverage-sticky {
+    background: var(--surface-2);
+  }
+  .coverage-table tbody tr:hover .coverage-sticky {
+    background: var(--surface-2);
+  }
+
+  /* Band tinting. The two column groups get faintly different grounds so the
+     eye can tell where the pipeline stops and the letter ladder starts, even
+     mid-scroll with the headers off screen. */
+  .coverage-table .band-letter {
+    background: color-mix(in srgb, var(--warn) 3.5%, transparent);
+  }
+  .coverage-table thead .band-letter {
+    background: color-mix(in srgb, var(--warn) 8%, var(--surface-2));
+  }
+
+  /* A count, tinted by how busy it is relative to its own column. */
+  .heat-cell {
+    display: inline-block;
+    min-width: 22px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  /* Territories holding nothing recede — they are real, but they are not what
+     anyone opened this page to look at. */
+  .coverage-table tbody tr[data-quiet="true"] {
+    opacity: 0.55;
+  }
+
+  .coverage-table tfoot td {
+    border-top: 1px solid var(--rule-strong);
+    background: var(--surface-2);
+    font-weight: 600;
+    padding-top: 9px;
+    padding-bottom: 9px;
+  }
+
+  /* Part A / Part B badge. Two halves of one organisation, so they share a
+     shape and differ only in hue — a different shape would imply a different
+     kind of thing. */
+  .part-pill {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .part-pill[data-part="A"] {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+  }
+  .part-pill[data-part="B"] {
+    background: color-mix(in srgb, var(--azure) 14%, var(--surface));
+    color: color-mix(in srgb, var(--azure) 72%, #000);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--azure) 34%, transparent);
+  }
+}
+
+/* ==========================================================================
+   ENGINEER ASSESSMENT
+   The cost-analysis form, built for a phone held in one hand next to a
+   half-stripped vehicle.
+
+   The governing constraint is the 44px touch target. Everything here that can
+   be tapped meets it, which is why the repair item is a card with two rows
+   rather than a table row with three squeezed controls.
+   ========================================================================== */
+
+@layer components {
+  .assess-panel {
+    /* The action bar is sticky inside the panel, so the panel itself must not
+       clip it or establish a competing scroll context. */
+    padding: 0;
+    overflow: visible;
+  }
+
+  /* ---- The figure ----
+     One number is typed on this screen now, so it gets a field built for it:
+     the currency sits inside the box as a fixed prefix rather than in the
+     label, and the numeral is set large enough to read back at arm's length
+     while standing next to the vehicle. */
+  .money-field {
+    display: flex;
+    align-items: stretch;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    overflow: hidden;
+    transition:
+      border-color 0.16s var(--ease-standard),
+      box-shadow 0.16s var(--ease-standard);
+  }
+  .money-field:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  .money-prefix {
+    display: grid;
+    place-items: center;
+    padding: 0 12px;
+    flex: none;
+    border-right: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+  }
+  .money-input {
+    flex: 1;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0 12px;
+    border: 0;
+    background: transparent;
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    outline: none;
+  }
+  .money-input::placeholder {
+    color: var(--ink-3);
+    font-weight: 400;
+  }
+  /* Chrome/Safari spinner arrows on a money field are a mis-tap waiting to
+     happen at this size. */
+  .money-input::-webkit-outer-spin-button,
+  .money-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .money-input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  /* ---- The estimate sheet ----
+     The other half of the submission. A dashed target while nothing is
+     attached, a plain "add another" once something is — the emptiness is the
+     prompt, and it should stop prompting the moment it is satisfied. */
+  .sheet-drop {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 56px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    cursor: pointer;
+    transition:
+      border-color 0.18s var(--ease-standard),
+      background-color 0.18s var(--ease-standard);
+  }
+  .sheet-drop[data-empty="true"] {
+    border-style: dashed;
+    border-color: var(--accent-line);
+    background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  }
+  .sheet-drop:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+  .sheet-drop:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+  .sheet-drop-glyph {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: 10px;
+    color: #fff;
+    background: linear-gradient(150deg, var(--accent-2), var(--accent));
+  }
+  .sheet-drop-title {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+  }
+  .sheet-drop-sub {
+    display: block;
+    margin-top: 1px;
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+
+  .sheet-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sheet-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 8px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+  }
+  .sheet-item[data-state="error"] {
+    border-color: color-mix(in srgb, var(--bad) 30%, var(--rule));
+    background: var(--bad-soft);
+  }
+  /* A PDF has no thumbnail, so it gets a document mark instead of a broken
+     image frame. The two sit at the same size so a mixed list stays a list. */
+  .sheet-face {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex: none;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    color: var(--ink-3);
+  }
+  .sheet-face[data-pdf] {
+    color: var(--bad-ink);
+    background: var(--bad-soft);
+    border-color: color-mix(in srgb, var(--bad) 20%, var(--rule));
+  }
+  .sheet-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .sheet-name {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sheet-open {
+    display: inline-block;
+    margin-top: 1px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent);
+  }
+  .sheet-state {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 1px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+  .sheet-x {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 8px;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: color 0.15s var(--ease-standard);
+  }
+  .sheet-x:hover:not(:disabled) {
+    color: var(--bad);
+  }
+  .sheet-x:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* The same document, seen from the approval side: a chip that opens it. */
+  .sheet-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    transition:
+      border-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .sheet-chip:hover {
+    border-color: var(--accent-line);
+    color: var(--accent);
+  }
+  .sheet-chip svg:first-child {
+    color: var(--accent);
+  }
+
+  /* ---- Sticky action bar ----
+     Sits at the bottom of the panel and stays there while the form scrolls, so
+     Submit is always one thumb-reach away. */
+  .assess-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--rule);
+    border-bottom-left-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+    background: var(--surface-2);
+  }
+  .assess-bar .btn {
+    min-height: 46px;
+    font-size: 14px;
+  }
+}
+
+/* A repair line's evidence photo, shown beside the line wherever the estimate
+   is read or adjusted. Small enough not to fight the numbers, large enough to
+   tell a cracked housing from a worn bearing at a glance; clicking opens the
+   full image through the authenticated file route. */
+@layer components {
+  .line-thumb {
+    display: block;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    transition:
+      border-color 0.18s var(--ease-standard),
+      transform 0.18s var(--ease-standard);
+  }
+  .line-thumb:hover {
+    border-color: var(--accent);
+    transform: scale(1.06);
+  }
+  .line-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+}
+
+/* The shared .field is 40px, which is right for a dense desktop form and two
+   pixels short of a comfortable tap target on a phone. This panel is only ever
+   used on a phone, so its inputs are raised to the 44px minimum rather than
+   changing .field everywhere and loosening every desk form to suit. */
+@layer components {
+  .assess-panel .field {
+    min-height: 46px;
+  }
+}
+
+/* Engineer identity chip on the repair board. Initials rather than a photo:
+   there are no avatars in the system, and a coloured monogram distinguishes
+   half a dozen names on a dense board faster than reading them does. */
+@layer components {
+  .eng-avatar {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .eng-avatar[data-trouble="true"] {
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 32%, transparent);
+  }
+}
+
+/* ==========================================================================
+   DESK FILTER ROW
+   Territory and capture window, sitting under the saved-view row.
+
+   Visually quieter than the row above it: those controls change how the queue
+   is presented, these change which files are in it, and a filter that shouts
+   competes with the queue it is meant to narrow.
+   ========================================================================== */
+
+@layer components {
+  .deskfilter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  }
+  .deskfilter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .deskfilter-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* A territory chip is a filter AND a count — the distribution is worth
+     seeing even when you are not filtering by it. */
+  .terr-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition:
+      border-color 0.16s var(--ease-standard),
+      background-color 0.16s var(--ease-standard),
+      color 0.16s var(--ease-standard);
+  }
+  .terr-chip:hover {
+    border-color: var(--rule-strong);
+    color: var(--ink);
+  }
+  .terr-chip[data-on="true"] {
+    background: var(--accent-soft);
+    border-color: var(--accent-line);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  .terr-count {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-variant-numeric: tabular-nums;
+    padding: 1px 4px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--ink-3);
+  }
+  .terr-chip[data-on="true"] .terr-count {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent-ink);
+  }
+}
+
+/* The monthly pricing cycle, on the Sr. Executive's panel. Three states, one
+   card: running, closing, and held — held is the only one that shouts, because
+   it is the only one that has stopped the vehicle earning. */
+@layer components {
+  .cycle-card {
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .cycle-card[data-state="closing"] {
+    border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+  }
+  .cycle-card[data-state="held"] {
+    border-color: color-mix(in srgb, var(--bad) 28%, transparent);
+    background: var(--bad-soft);
+    color: var(--bad-ink);
+  }
+}
+
+/* ==========================================================================
+   RESALE DESK
+   Master–detail: a compact list of what is listed, and the decision beside it.
+
+   The two halves are deliberately unequal. The list is an index — enough to
+   recognise a vehicle and see whether anyone wants it — while the decision
+   needs room for every offer, the cost basis and the margin that follows.
+   ========================================================================== */
+
+@layer components {
+  .resale-split {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 1024px) {
+    .resale-split {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+      align-items: start;
+    }
+    /* The decision follows the list as it scrolls: comparing an offer against
+       a row further down the page should not mean losing sight of either. */
+    .resale-detail {
+      position: sticky;
+      top: 16px;
+    }
+  }
+
+  .resale-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .resale-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    text-align: left;
+    transition:
+      border-color 0.16s var(--ease-standard),
+      box-shadow 0.16s var(--ease-standard),
+      background-color 0.16s var(--ease-standard);
+  }
+  .resale-row:hover {
+    border-color: var(--rule-strong);
+    box-shadow: var(--shadow-xs);
+  }
+  /* Open state is the tinted ground plus the accent hairline. The inset left
+     rail that used to sit on top of both was a third way of saying it. */
+  .resale-row[data-open="true"] {
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
+  }
+
+  .resale-thumb {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 34px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+  .resale-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .resale-hero {
+    display: grid;
+    place-items: center;
+    width: 76px;
+    height: 58px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+  .resale-hero img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* One standing offer. Picking is a selection, not a submission — the sale
+     only happens on the button below, so the row stays reversible. */
+  .offer-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 7px 9px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    transition:
+      border-color 0.16s var(--ease-standard),
+      background-color 0.16s var(--ease-standard);
+  }
+  .offer-row:hover {
+    border-color: var(--rule-strong);
+  }
+  .offer-row[data-picked="true"] {
+    border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+    background: var(--ok-soft);
+  }
+}
+
+/* ==========================================================================
+   STAGE LOCK
+   What a desk sees where its inputs used to be.
+
+   Deliberately flat and quiet — a locked section is not a problem, it is a
+   finished one. The rework banner is the opposite: it means somebody rejected
+   your work and you need to read why, so it carries the warning tone.
+   ========================================================================== */
+
+@layer components {
+  .stage-lock {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1px dashed var(--rule-strong);
+    background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  }
+  /* Waiting is even quieter than locked: nothing has happened yet, and there
+     is nothing for this desk to do about it. */
+  .stage-lock[data-state="waiting"] {
+    opacity: 0.72;
+  }
+  .stage-lock-icon {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    background: var(--surface-3);
+    color: var(--ink-3);
+  }
+  .stage-lock[data-state="locked"] .stage-lock-icon {
+    background: var(--surface);
+    color: var(--ink-2);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+  }
+
+  .rework-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 11px 13px;
+    border-radius: var(--radius);
+    border: 1px solid color-mix(in srgb, var(--warn) 34%, transparent);
+    background: var(--warn-soft);
+    color: var(--warn-ink);
+  }
+}
+
+/* ==========================================================================
+   THE EMPTY BENCH
+   The one state on this panel with nothing to read, and therefore the only
+   one where the surface is allowed to be the thing you look at.
+   ========================================================================== */
+
+@layer components {
+  .bench-empty {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    gap: 10px;
+    padding: 34px 24px 38px;
+    text-align: center;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+
+  /* The wash rises from the foot rather than falling from the head: the card
+     sits under a list that has just ended, and lifting the colour from the
+     bottom edge keeps the eye travelling down into it instead of bouncing off
+     a tinted top. */
+  .bench-empty-wash {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 78% at 50% 112%,
+        color-mix(in srgb, var(--accent) 15%, transparent) 0%,
+        transparent 62%),
+      radial-gradient(80% 60% at 14% 4%,
+        color-mix(in srgb, var(--cat-assess) 9%, transparent) 0%,
+        transparent 70%);
+  }
+
+  /* One arc, drawn as the edge of a very large circle. A wave would be
+     ornament; an arc is the same geometry as the gauge on the hero and the
+     rings on the cards, so the panel keeps one shape vocabulary throughout. */
+  /* The crest must clear the copy.
+     At `bottom: -128%` the arc's top edge landed at about half the card's
+     height, which put a hairline straight through "Nothing to assess" — it
+     read as a rule under the heading rather than as the far edge of a circle.
+     Anchored to the lower third instead, so the arc is the ground the text
+     stands on and never crosses it. */
+  .bench-empty-arc {
+    position: absolute;
+    right: -34%;
+    bottom: 0;
+    left: -34%;
+    z-index: -1;
+    height: 46%;
+    pointer-events: none;
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    border-top: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 6%, transparent),
+      transparent 68%
+    );
+  }
+
+  .bench-empty-plate {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+      0 8px 20px -10px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+  .bench-spark {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.28;
+    animation: bench-spark 3.4s var(--ease-standard) infinite;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes bench-spark {
+    0%, 100% { opacity: 0.16; transform: scale(0.8); }
+    45% { opacity: 0.7; transform: scale(1.15); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bench-spark {
+      animation: none;
+      opacity: 0.3;
+    }
+  }
+}

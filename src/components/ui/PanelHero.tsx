@@ -1,92 +1,78 @@
-"use client";
+import type { ReactNode } from "react";
 
 /**
- * The gradient hero that opens a role's panel.
+ * The masthead that opens a panel.
  *
- * Two artwork variants keep the surfaces related without being identical:
- * `field` (a map, a route, a pin) for the recovery panel, and `desk` (stacked
- * files moving through an approval) for the eight approving desks.
+ * Editorial, not decorative — a rule, an eyebrow, the title, and orientation.
+ * What it replaced was a gradient panel carrying an SVG of stacked files
+ * crossing an approval gate: filler that said nothing about the page it
+ * topped and was identical on every one of them.
+ *
+ * The one structural change since: it is now a SPLIT. Type on the left, the
+ * page's own numbers on the right.
+ *
+ * That split exists because of what the subtitle had become. "14 in flight ·
+ * 1 live for resale · 18 records in total" is not a sentence — it is three
+ * readings wearing a sentence's clothes, set in the muted grey reserved for
+ * things you may skip, and punctuated with interpuncts because there was
+ * nowhere else to put them. Given a column of their own, each one gets a
+ * figure sized like a figure and a label sized like a label, and the eye can
+ * take all three without reading left to right.
+ *
+ * Callers that have prose keep passing `subtitle` and get the old single
+ * column. Callers with readings pass `facts` instead. A caller with both is
+ * legitimate — a sentence on the left, the numbers on the right.
  */
+
+export interface HeroFact {
+  label: string;
+  value: string;
+  /** Optional emphasis for the one reading that matters most on this page. */
+  accent?: boolean;
+}
+
 export function PanelHero({
   eyebrow,
   title,
   subtitle,
-  art = "desk",
+  facts,
+  aside,
 }: {
   eyebrow: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
+  /** The page's headline numbers, set as a right-hand rail. */
+  facts?: HeroFact[];
+  /** Anything else the page wants in that corner — a control, a chip. */
+  aside?: ReactNode;
+  /** Retained so existing callsites keep compiling; the art is gone. */
   art?: "desk" | "field";
 }) {
+  const hasRight = (facts && facts.length > 0) || !!aside;
+
   return (
-    <section className="hero px-4 py-4" style={{ animation: "fadeIn 0.3s var(--ease-standard)" }}>
-      <div className="relative z-10 max-w-[66%]">
-        <div className="eyebrow" style={{ color: "var(--accent)" }}>
-          {eyebrow}
+    <header className="hero pt-3">
+      <div className="hero-split">
+        <div className="min-w-0">
+          <div className="eyebrow text-accent">{eyebrow}</div>
+          <h1 className="page-title mt-1.5">{title}</h1>
+          {subtitle && (
+            <p className="mt-1.5 max-w-2xl text-[13px] leading-snug text-ink-2">{subtitle}</p>
+          )}
         </div>
-        <h1 className="page-title mt-1 text-[25px]">{title}</h1>
-        <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{subtitle}</p>
+
+        {hasRight && (
+          <div className="hero-rail">
+            {facts?.map((f) => (
+              <div key={f.label} className="hero-fact" data-accent={f.accent || undefined}>
+                <span className="hero-fact-value">{f.value}</span>
+                <span className="hero-fact-label">{f.label}</span>
+              </div>
+            ))}
+            {aside}
+          </div>
+        )}
       </div>
-      {art === "desk" ? <DeskArt /> : null}
-    </section>
-  );
-}
-
-/** Stacked files crossing an approval gate — abstract, no literal iconography. */
-function DeskArt() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 200 150"
-      className="pointer-events-none absolute -right-2 top-1/2 h-[128%] -translate-y-1/2"
-      fill="none"
-    >
-      {/* back sheets, fanned */}
-      <g opacity="0.9">
-        <rect
-          x="58" y="44" width="76" height="96" rx="10"
-          fill="rgba(255,255,255,0.5)"
-          transform="rotate(-11 96 92)"
-        />
-        <rect
-          x="66" y="40" width="76" height="96" rx="10"
-          fill="rgba(255,255,255,0.7)"
-          transform="rotate(-5 104 88)"
-        />
-      </g>
-
-      {/* front sheet with content rules */}
-      <g>
-        <rect x="74" y="36" width="78" height="98" rx="11" fill="rgba(255,255,255,0.94)" />
-        <g stroke="rgba(14,80,84,0.16)" strokeWidth="2.5" strokeLinecap="round">
-          <path d="M86 56h42M86 68h54M86 80h34M86 92h48" />
-        </g>
-        {/* the figure being approved */}
-        <rect x="86" y="104" width="34" height="9" rx="4.5" fill="var(--accent)" opacity="0.22" />
-      </g>
-
-      {/* approval badge */}
-      <g transform="translate(140 88)">
-        <circle cx="20" cy="20" r="20" fill="var(--accent)" />
-        <path
-          d="M12 20.5l5.5 5.5L28 15.5"
-          stroke="#fff"
-          strokeWidth="3.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </g>
-
-      {/* flow arc into the badge */}
-      <path
-        d="M150 58c14 4 18 14 12 24"
-        stroke="var(--accent)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeDasharray="5 6"
-        opacity="0.55"
-      />
-    </svg>
+    </header>
   );
 }

@@ -35,7 +35,7 @@ export function VehicleActions({
   if (actions.length === 0) return null;
 
   return (
-    <section className="card p-4" style={{ animation: "slideUp 0.2s ease 0.1s both" }}>
+    <section className="card p-4" style={{ animation: "slideUp 0.2s var(--ease-out-quart) 0.1s both" }}>
       <h2 className="mb-4 font-display text-[15px] font-bold text-ink">Actions</h2>
       <div className="flex flex-col gap-2.5">
         {actions.map((t, i) => {
@@ -45,7 +45,7 @@ export function VehicleActions({
             <button
               key={t.action}
               className={`btn ${cls} btn-block`}
-              style={{ animation: `fadeIn 0.15s ease ${i * 0.05}s both` }}
+              style={{ animation: `fadeIn 0.15s var(--ease-standard) ${i * 0.05}s both` }}
               onClick={() =>
                 setPending({
                   action: t.action,
