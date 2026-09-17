@@ -1,7 +1,8 @@
 import { credentialHash, normaliseStaffId } from "@/lib/credential";
-import { ok, withGuard } from "@/lib/api";
+import { ok, fail, withGuard } from "@/lib/api";
 import { requireRole } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { resolveTerritoryNames } from "@/lib/masterData";
 import { userImportSchema } from "@/lib/validation";
 
 /**
@@ -43,11 +44,63 @@ export const POST = withGuard(async (request: Request) => {
   // Territories are matched by name, case- and space-insensitively: the admin
   // has the map, not our ids, and "Dhaka North" should not fail against
   // "dhaka  north".
-  const territories = await prisma.territory.findMany({
-    select: { id: true, name: true },
-  });
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-  const byName = new Map(territories.map((t) => [norm(t.name), t.id]));
+
+  // ---- The file is read as a whole before anything is written -------------
+  //
+  // A patch's part belongs to the TERRITORY, not to the officer, so two rows
+  // naming the same patch have to agree about it. Letting the last row win
+  // would mean the classification of a territory depended on the order of a
+  // spreadsheet — and the person who wrote it would never know which of their
+  // two answers had been taken.
+  //
+  // So contradictions are found first, and the rows that disagree are skipped
+  // with both answers quoted back. Everything else in the file still imports:
+  // one inconsistent patch should not cost an admin the other ninety rows.
+  const partsSeen = new Map<string, Set<"A" | "B">>();
+  for (const r of data.rows) {
+    if (r.role === "SALES_TEAM" || !r.territory || !r.part) continue;
+    const key = norm(r.territory);
+    const set = partsSeen.get(key) ?? new Set<"A" | "B">();
+    set.add(r.part);
+    partsSeen.set(key, set);
+  }
+  const contradictory = new Map<string, string>();
+  for (const [key, set] of partsSeen) {
+    if (set.size > 1) contradictory.set(key, [...set].sort().join(" and "));
+  }
+
+  // Patches named in the file that do not exist yet are CREATED, with the part
+  // the file gives them. A territory comes into being when somebody is posted
+  // to it — the import obeys the same rule as the users form, so a bulk load
+  // no longer depends on a list somebody built by hand first.
+  const wantedNames = [
+    ...new Set(
+      data.rows
+        .filter(
+          (r) =>
+            r.role !== "SALES_TEAM" && r.territory && !contradictory.has(norm(r.territory)),
+        )
+        .map((r) => r.territory!.trim()),
+    ),
+  ];
+  const partByName = new Map<string, "A" | "B" | null>();
+  for (const r of data.rows) {
+    if (r.role === "SALES_TEAM" || !r.territory || !r.part) continue;
+    if (contradictory.has(norm(r.territory))) continue;
+    partByName.set(r.territory.trim().toLowerCase(), r.part);
+  }
+
+  const resolved = await resolveTerritoryNames(wantedNames, partByName);
+  if ("error" in resolved) return fail(resolved.error, 422);
+
+  // Keyed by the looser `norm` the file is matched with, not by the exact
+  // spelling resolveTerritoryNames returns.
+  const byName = new Map<string, string>();
+  for (const name of wantedNames) {
+    const id = resolved.idByName.get(name.toLowerCase());
+    if (id) byName.set(norm(name), id);
+  }
 
   // One read for every Staff ID in the file, rather than one per row.
   const taken = new Set(
@@ -83,12 +136,22 @@ export const POST = withGuard(async (request: Request) => {
     // reported rather than quietly written to the other one.
     let territoryId: string | null = null;
     if (r.role !== "SALES_TEAM" && r.territory) {
-      const found = byName.get(norm(r.territory));
+      const key = norm(r.territory);
+      const clash = contradictory.get(key);
+      if (clash) {
+        skipped.push({
+          line,
+          staffId: r.staffId,
+          reason: `The file puts "${r.territory}" in part ${clash}. A patch is in one part — fix the file and re-import.`,
+        });
+        return;
+      }
+      const found = byName.get(key);
       if (!found) {
         skipped.push({
           line,
           staffId: r.staffId,
-          reason: `No territory called "${r.territory}" — add it under Master data first`,
+          reason: `Could not create territory "${r.territory}"`,
         });
         return;
       }

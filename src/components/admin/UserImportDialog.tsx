@@ -63,6 +63,10 @@ interface Parsed {
   designation: string;
   territory: string;
   salesTerritory: string;
+  /** "A" / "B", already normalised from whatever the file said. */
+  part: "A" | "B" | "";
+  /** This patch does not exist yet — it will be created by the import. */
+  newTerritory: boolean;
   /** Empty when the row is good to send. */
   error: string;
 }
@@ -74,10 +78,15 @@ interface ImportReport {
 }
 
 const TEMPLATE = [
-  ["staff_id", "name", "role", "designation", "territory", "sales_territory"],
-  ["ARO-014", "Rakib Hasan", "Recovery Team", "Sr. ARO", "Dhaka North", "", ""],
-  ["SE-007", "Tanvir Ahmed", "Service Engineer", "Sr. SE", "Dhaka North", "", ""],
-  ["MO-021", "Jubayer Alam", "Sales Team", "Sr. MO", "", "Mirpur", ""],
+  ["staff_id", "name", "role", "designation", "territory", "part", "sales_territory"],
+  // Part is read generously — "A", "a", "Part A" and "part-a" all mean A — so
+  // the column is easy to fill from a list somebody already keeps.
+  ["ARO-014", "Rakib Hasan", "Recovery Team", "Sr. ARO", "Dhaka North", "A", ""],
+  ["ARO-022", "Imran Kabir", "Recovery Team", "ARO", "Chittagong South", "Part B", ""],
+  // An engineer works a bench, not a map: no territory, no part.
+  ["SE-007", "Tanvir Ahmed", "Service Engineer", "Sr. SE", "", "", ""],
+  // Sales draws its own map, in its own column.
+  ["MO-021", "Jubayer Alam", "Sales Team", "Sr. MO", "", "", "Mirpur"],
 ];
 
 export function UserImportDialog({
@@ -101,8 +110,40 @@ export function UserImportDialog({
     [territories],
   );
 
-  const good = rows?.filter((r) => !r.error) ?? [];
-  const bad = rows?.filter((r) => r.error) ?? [];
+  const good = useMemo(() => rows?.filter((r) => !r.error) ?? [], [rows]);
+  const bad = useMemo(() => rows?.filter((r) => r.error) ?? [], [rows]);
+
+  /** Patches this file will bring into existence. */
+  const newPatches = useMemo(
+    () => [...new Set(good.filter((r) => r.newTerritory).map((r) => r.territory))],
+    [good],
+  );
+
+  /**
+   * A patch given two different parts by the same file.
+   *
+   * Part belongs to the TERRITORY, so two rows naming one patch have to agree.
+   * Letting the last row win would make a territory's classification depend on
+   * spreadsheet order, and the person who wrote it would never learn which of
+   * their two answers was taken. The server refuses these rows too; this is so
+   * it is visible before the upload rather than in the receipt after it.
+   */
+  const partClashes = useMemo(() => {
+    const seen = new Map<string, Set<string>>();
+    for (const r of good) {
+      if (!r.territory || !r.part) continue;
+      const key = r.territory.toLowerCase().replace(/\s+/g, " ");
+      const set = seen.get(key) ?? new Set<string>();
+      set.add(r.part);
+      seen.set(key, set);
+    }
+    return [...seen.entries()]
+      .filter(([, set]) => set.size > 1)
+      .map(([key, set]) => ({
+        name: good.find((r) => r.territory.toLowerCase().replace(/\s+/g, " ") === key)!.territory,
+        parts: [...set].sort().join(" and "),
+      }));
+  }, [good]);
 
   const downloadTemplate = () => {
     const blob = new Blob([CSV_BOM + toCsv(TEMPLATE)], { type: "text/csv;charset=utf-8" });
@@ -147,13 +188,23 @@ export function UserImportDialog({
         const role = ROLE_WORDS[roleRaw.toLowerCase().replace(/[\s\-_.]+/g, "")] ?? null;
         const territory = rec.territory ?? "";
         const salesTerritory = rec.salesterritory ?? "";
+        // "A", "a", "Part A", "part-b" — all the same two answers.
+        const partRaw = (rec.part ?? "").trim().toUpperCase().replace(/^PART[\s\-_]*/, "");
+        const part: "A" | "B" | "" = partRaw === "A" || partRaw === "B" ? partRaw : "";
+        const newTerritory =
+          role !== "SALES_TEAM" &&
+          !!territory &&
+          !known.has(territory.toLowerCase().replace(/\s+/g, " "));
 
         let error = "";
         if (!staffId) error = "Staff ID is blank";
         else if (!name) error = "Name is blank";
         else if (!role) error = `"${roleRaw || "blank"}" is not a role this import accepts`;
-        else if (role !== "SALES_TEAM" && territory && !known.has(territory.toLowerCase().replace(/\s+/g, " ")))
-          error = `No territory called "${territory}"`;
+        // An unknown territory is no longer an error. A patch comes into being
+        // when somebody is posted to it, so the import creates it — the row is
+        // flagged as new in the preview instead of refused.
+        else if (partRaw && partRaw !== "A" && partRaw !== "B")
+          error = `Part must be A or B, not "${rec.part}"`;
 
         if (!error) {
           const dup = seen.get(staffId.toLowerCase());
@@ -161,7 +212,19 @@ export function UserImportDialog({
           else seen.set(staffId.toLowerCase(), line);
         }
 
-        return { line, staffId, name, role, roleRaw, designation: rec.designation ?? "", territory, salesTerritory, error };
+        return {
+          line,
+          staffId,
+          name,
+          role,
+          roleRaw,
+          designation: rec.designation ?? "",
+          territory,
+          salesTerritory,
+          part,
+          newTerritory,
+          error,
+        };
       });
 
       setRows(parsed);
@@ -183,6 +246,7 @@ export function UserImportDialog({
           role: r.role,
           designation: r.designation,
           territory: r.territory,
+          part: r.part,
           salesTerritory: r.salesTerritory,
         })),
       });
@@ -277,10 +341,13 @@ export function UserImportDialog({
         <p className="mt-2 text-[11.5px] leading-snug text-ink-3">
           Columns: <strong className="text-ink-2">staff_id</strong>,{" "}
           <strong className="text-ink-2">name</strong> and{" "}
-          <strong className="text-ink-2">role</strong> are required; designation, territory and
-          sales_territory are optional. There is no password column — each person signs in with
-          their own Staff ID. Role accepts &ldquo;Recovery Team&rdquo;,
-          &ldquo;Sales Team&rdquo;, &ldquo;Service Engineer&rdquo; or the short forms ARO, MO, SE.
+          <strong className="text-ink-2">role</strong> are required; designation, territory,
+          part and sales_territory are optional. There is no password column — each person signs
+          in with their own Staff ID. Role accepts &ldquo;Recovery Team&rdquo;,
+          &ldquo;Sales Team&rdquo;, &ldquo;Service Engineer&rdquo; or the short forms ARO, MO, SE.{" "}
+          <strong className="text-ink-2">part</strong> is A or B and applies to the territory, not
+          the person — &ldquo;A&rdquo;, &ldquo;a&rdquo; and &ldquo;Part A&rdquo; all read the same.
+          A territory the file names but does not exist yet is created.
         </p>
 
         <button
@@ -336,6 +403,15 @@ export function UserImportDialog({
                   {bad.length} with problems
                 </span>
               )}
+              {newPatches.length > 0 && (
+                <span
+                  className="rounded-full px-2.5 py-1 font-mono text-[11px] font-bold"
+                  style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                  title={newPatches.join(", ")}
+                >
+                  {newPatches.length} new {newPatches.length === 1 ? "patch" : "patches"}
+                </span>
+              )}
               {IMPORT_ROLES.map((r) => {
                 const n = good.filter((g) => g.role === r).length;
                 if (!n) return null;
@@ -346,6 +422,25 @@ export function UserImportDialog({
                 );
               })}
             </div>
+
+            {/* Named before they are created, because "3 new patches" is the
+                kind of number an admin should read rather than discover. */}
+            {newPatches.length > 0 && (
+              <p className="mt-2 text-[11.5px] leading-snug text-ink-3">
+                Will be created: <strong className="text-ink-2">{newPatches.join(", ")}</strong>.
+                A patch comes into being when somebody is posted to it — there is no list to
+                add them to first.
+              </p>
+            )}
+
+            {partClashes.length > 0 && (
+              <div className="mt-3 rounded-lg border border-bad/25 bg-bad-soft px-3 py-2.5 text-[12px] text-bad-ink">
+                <strong>One patch, two parts.</strong>{" "}
+                {partClashes.map((c) => `"${c.name}" is given ${c.parts}`).join("; ")}. A
+                territory sits in one part — fix the file and re-import. Those rows will be
+                skipped; the rest still import.
+              </div>
+            )}
 
             {bad.length > 0 && (
               <ul className="mt-3 max-h-40 overflow-y-auto rounded-[var(--radius)] border border-rule">

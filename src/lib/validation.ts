@@ -609,6 +609,27 @@ export const userImportRowSchema = z.object({
   territory: z.string().trim().max(80).optional().or(z.literal("")),
   /** The sales patch. Free text, and only meaningful on a sales officer. */
   salesTerritory: z.string().trim().max(80).optional().or(z.literal("")),
+  /**
+   * Which half of the recovery organisation the territory belongs to.
+   *
+   * Typed by a person into a spreadsheet, so it is read generously: "A",
+   * "a", "Part A" and "part-a" all mean part A. Being strict here would
+   * reject a file over a word nobody was asked to omit, and the value is a
+   * single letter either way.
+   *
+   * A property of the TERRITORY, not of this officer — see
+   * resolveTerritoryNames — so two rows naming the same patch must agree
+   * about it. The import checks that rather than letting the last row win.
+   */
+  part: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => {
+      const t = (v ?? "").trim().toUpperCase().replace(/^PART[\s\-_]*/, "");
+      return t === "A" || t === "B" ? (t as "A" | "B") : null;
+    }),
 });
 
 export const userImportSchema = z
