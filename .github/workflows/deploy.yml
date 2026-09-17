@@ -98,6 +98,41 @@ jobs:
           cp prisma/schema.prisma .deploy/app/prisma/schema.prisma
           cp -r deploy .deploy/app/deploy
 
+          # SHIP THE REAL PRISMA CLIENT, NOT THE TRACED ONE.
+          #
+          # This is what has been crashing the application on boot:
+          #
+          #   Error: An error occurred while loading instrumentation hook:
+          #   Failed to load external module @prisma/client-…:
+          #   SyntaxError: Unexpected token '.'
+          #
+          # Next's file tracer does not follow @prisma/client's entry chain.
+          # `main` is default.js, which re-exports `.prisma/client/default`,
+          # which in turn requires `#main-entry-point` — a package `imports`
+          # subpath, resolved through .prisma/client's own package.json rather
+          # than by a path the tracer can see. So what lands in the standalone
+          # output is a three-file skeleton — default.js, package.json and
+          # runtime/ — with no index.js behind it, and requiring it fails.
+          #
+          # instrumentation.ts is what surfaces it. That hook runs on server
+          # start and imports lib/photoRetention, which imports lib/prisma, so
+          # an unloadable client is a boot failure rather than a bad request:
+          # Passenger never gets a listening process and answers 500 to
+          # everything it cannot serve statically out of public/.
+          #
+          # Copying the installed package over the traced one is the standard
+          # fix. Cheap, and it cannot regress: it can only ever add files the
+          # tracer decided were unreachable.
+          rm -rf .deploy/app/node_modules/@prisma/client .deploy/app/node_modules/.prisma
+          mkdir -p .deploy/app/node_modules/@prisma
+          cp -a node_modules/@prisma/client .deploy/app/node_modules/@prisma/client
+          cp -a node_modules/.prisma .deploy/app/node_modules/.prisma
+
+          # Fail the build rather than ship the skeleton again.
+          test -f .deploy/app/node_modules/@prisma/client/index.js
+          test -f .deploy/app/node_modules/.prisma/client/index.js
+          echo "prisma client: $(ls .deploy/app/node_modules/@prisma/client | wc -l) entries"
+
           # cPanel's Node.js App puts a node_modules SYMLINK in the application
           # root, which blocks extraction over it. Nesting the real app one
           # level down sidesteps that; this shim is the startup file Passenger
