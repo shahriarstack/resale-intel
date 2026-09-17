@@ -62,7 +62,7 @@ jobs:
           username: ${{ secrets.CPANEL_USER }}
           password: ${{ secrets.CPANEL_PASS }}
           local-dir: ./
-          server-dir: /public_html/resale.cv-acimotors.com/
+          server-dir: /public_html/resale/
           exclude: |
             **/*
             !build.zip
@@ -70,4 +70,4 @@ jobs:
       - name: Extract Zip on cPanel
         run: |
           curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
-          "https://116.202.222.251:2083/json-api/cpanel?cpanel_jsonapi_apiversion=2&cpanel_jsonapi_module=Fileman&cpanel_jsonapi_func=fileop&op=extract&sourcefiles=build.zip&destdir=/home/cvacimot/public_html/resale.cv-acimotors.com" -k
+          "https://116.202.222.251:2083/json-api/cpanel?cpanel_jsonapi_apiversion=2&cpanel_jsonapi_module=Fileman&cpanel_jsonapi_func=fileop&op=extract&sourcefiles=build.zip&destdir=/home/cvacimot/public_html/resale" -k
