@@ -51,14 +51,9 @@ jobs:
           mkdir -p .deploy/tmp
           touch .deploy/tmp/restart.txt
 
-      - name: Deploy to cPanel via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: 116.202.222.251
-          username: ${{ secrets.CPANEL_USER }}
-          password: ${{ secrets.CPANEL_PASS }}
-          local-dir: ./.deploy/
-          server-dir: /public_html/resale.cv-acimotors.com/
-          exclude: |
-            **/.git*
-            **/.git*/**
+      - name: Deploy to cPanel via Rsync (SSH)
+        run: |
+          sudo apt-get update && sudo apt-get install -y sshpass rsync
+          export SSHPASS='${{ secrets.CPANEL_PASS }}'
+          sshpass -e rsync -avz --delete -e "ssh -p 2000 -o StrictHostKeyChecking=no" \
+            .deploy/ cvacimot@116.202.222.251:/home/cvacimot/public_html/resale.cv-acimotors.com/
