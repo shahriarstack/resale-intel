@@ -73,7 +73,7 @@ export function Modal({
       aria-modal="true"
       aria-labelledby={labelledBy}
     >
-      <div className={`modal-panel ${maxWidth}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`modal-panel modal-panel-split ${maxWidth}`} onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>,

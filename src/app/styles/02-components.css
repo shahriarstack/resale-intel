@@ -1306,42 +1306,49 @@
     max-height: calc(100dvh - 32px);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* THE PANEL SCROLLS ITSELF BY DEFAULT.
+       Most dialogs in this product are hand-rolled — `.modal-panel` with
+       padding and their own children, not the Header/Body/Footer trio — so a
+       panel that clipped its overflow put their last field and their save
+       button outside the box with no way to reach either. Scrolling is the
+       safe default because it is the behaviour a dialog that knows nothing
+       about its own contents should have. */
+    overflow-y: auto;
     overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     animation: slideUp 0.22s var(--ease-standard);
   }
 
-  /* ---- Why the Save button was unreachable ----------------------------
-     The panel is a clipped flex column. A flex child will not shrink below
-     its own content unless it is told it may — `min-height: 0` — so a form
-     taller than the screen pushed the footer past the panel's edge, where
-     `overflow: hidden` cut it off. Nothing scrolled, because nothing was
-     allowed to: the body had no overflow of its own and the panel refused to
-     grow. The button was not hidden. It was outside the box.
+  /* ---- The composed dialog opts out ----------------------------------
+     `Modal` builds a header, a scrolling body and a pinned footer, so there
+     the PANEL must not scroll — the body does, and the footer stays put with
+     the save button always visible. Marked explicitly rather than detected
+     with `:has()`, so the rule does not depend on selector support. */
+  .modal-panel-split {
+    overflow: hidden;
+  }
 
-     Three rules fix every dialog in the product at once, which is the point
-     of them living on the component rather than on the form that noticed. */
   .modal-head,
   .modal-foot {
     flex-shrink: 0;
   }
 
+  /* A flex child will not shrink below its own content unless it is told it
+     may. Without `min-height: 0` the body keeps its full height, pushes the
+     footer past the panel's edge, and nothing scrolls because nothing was
+     allowed to. */
   .modal-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    /* A scroll that reaches its end must not carry on into the page behind
-       the dialog — on a phone that reads as the dialog falling apart. */
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* The footer earns a hairline once the body is actually scrolling, so a
-     short dialog stays a single clean surface and a long one shows where the
-     content stops. */
   .modal-foot {
     background: var(--surface);
   }
+
   @media (min-width: 640px) {
     .modal-panel {
       animation: scaleIn 0.2s var(--ease-standard);
