@@ -1,18 +1,76 @@
-name: Deploy to cPanel
+name: Build and Deploy to cPanel
 
 on:
   push:
     branches:
       - '**'
+      - '!cpanel-deploy' # Ignore to prevent infinite loops
+
+permissions:
+  contents: write
 
 jobs:
-  deploy:
-    name: Trigger cPanel Git Update
+  build-and-deploy:
+    name: Build Next.js and Trigger cPanel
     runs-on: ubuntu-latest
     steps:
-      - name: Call cPanel UAPI to Pull and Deploy
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Prisma Generate
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "mysql://cvacimot_usr:Strong!@#Password123@116.202.222.251:3306/cvacimot_resale"
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Prepare cPanel Files
+        run: |
+          mkdir -p .deploy
+          # Move standalone output to deploy folder
+          cp -r .next/standalone/* .deploy/
+          cp -r .next/standalone/.env* .deploy/ 2>/dev/null || true
+          
+          # Copy static files Next.js needs
+          cp -r .next/static .deploy/.next/static
+          cp -r public .deploy/public
+          
+          # Create lightweight cpanel deploy script
+          cat << 'EOF' > .deploy/.cpanel.yml
+          ---
+          deployment:
+            tasks:
+              - export DEPLOYPATH=/home/cvacimot/public_html/resale.cv-acimotors.com
+              - /bin/cp -a * $DEPLOYPATH/
+              - /bin/cp -a .next $DEPLOYPATH/
+              - mkdir -p $DEPLOYPATH/tmp
+              - touch $DEPLOYPATH/tmp/restart.txt
+          EOF
+
+      - name: Force Push Build to cpanel-deploy Branch
+        run: |
+          cd .deploy
+          git init
+          git config user.name "GitHub Actions Deployer"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Deploy build to cPanel"
+          git push --force "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/cpanel-deploy
+
+      - name: Trigger cPanel to Pull cpanel-deploy Branch
         run: |
           curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
-          "https://116.202.222.251:2083/execute/VersionControl/update?repository_root=/home/cvacimot/repositories/resale&branch=rebuild/foundations" -k
+          "https://116.202.222.251:2083/execute/VersionControl/update?repository_root=/home/cvacimot/repositories/resale&branch=cpanel-deploy" -k
           curl -s -u '${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}' \
           "https://116.202.222.251:2083/execute/VersionControlDeployment/create?repository_root=/home/cvacimot/repositories/resale" -k
