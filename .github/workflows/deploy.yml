@@ -153,12 +153,17 @@ jobs:
 
       # FTPS rather than plain FTP. The previous version set no `protocol`, and
       # this action defaults to unencrypted FTP — the account password and the
-      # entire release crossing the internet in clear. `security: loose`
-      # because the certificate is issued for the hostname, not the bare IP.
+      # entire release crossing the internet in clear.
+      #
+      # `security: loose` still tolerates a certificate this action cannot
+      # chain, which shared-host FTPS commonly presents even on the right
+      # hostname. Try `strict` once a deploy has been seen to work; the
+      # transport is encrypted either way, and this is not the step that was
+      # sending the password in the clear.
       - name: Upload release
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ vars.CPANEL_HOST || '116.202.222.251' }}
+          server: ${{ vars.CPANEL_HOST }}
           username: ${{ secrets.CPANEL_USER }}
           password: ${{ secrets.CPANEL_PASS }}
           protocol: ftps
@@ -175,17 +180,19 @@ jobs:
       # the live application on demand. DELETE THAT FILE FROM THE SERVER:
       #   /home/cvacimot/public_html/resale.cv-acimotors.com/unzip.php
       #
-      # `-k` survives here only because the API is addressed by IP while the
-      # certificate is issued for the hostname. Set the CPANEL_HOST repository
-      # variable to the cPanel hostname and drop `-k` to close that.
+      # TLS is verified. The previous version addressed the API by bare IP and
+      # passed `-k`, which disables certificate checking entirely — the account
+      # password went out over a connection nothing authenticated. The
+      # CPANEL_HOST repository variable now holds the real hostname the
+      # certificate is issued for, so the check passes on its own merits.
       - name: Extract on cPanel
         env:
-          HOST: ${{ vars.CPANEL_HOST || '116.202.222.251' }}
+          HOST: ${{ vars.CPANEL_HOST }}
           AUTH: ${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}
         run: |
           set -euo pipefail
           echo "Extracting into $APP_ROOT"
-          curl -sS -k -u "$AUTH" --get "https://$HOST:2083/json-api/cpanel" \
+          curl -sS -u "$AUTH" --get "https://$HOST:2083/json-api/cpanel" \
             --data-urlencode "cpanel_jsonapi_apiversion=2" \
             --data-urlencode "cpanel_jsonapi_module=Fileman" \
             --data-urlencode "cpanel_jsonapi_func=fileop" \
@@ -207,11 +214,11 @@ jobs:
       # again through the API covers an extractor that preserved an old mtime.
       - name: Restart the application
         env:
-          HOST: ${{ vars.CPANEL_HOST || '116.202.222.251' }}
+          HOST: ${{ vars.CPANEL_HOST }}
           AUTH: ${{ secrets.CPANEL_USER }}:${{ secrets.CPANEL_PASS }}
         run: |
           set -euo pipefail
-          curl -sS -k -u "$AUTH" --get "https://$HOST:2083/execute/Fileman/save_file_content" \
+          curl -sS -u "$AUTH" --get "https://$HOST:2083/execute/Fileman/save_file_content" \
             --data-urlencode "dir=$APP_ROOT/tmp" \
             --data-urlencode "file=restart.txt" \
             --data-urlencode "content=restarted $(date -u +%FT%TZ)" > /dev/null
